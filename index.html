@@ -588,6 +588,121 @@
       max-width: 300px;
     }
   }
+
+  /* ========== TUTORIAL ========== */
+  #tutorial-overlay {
+    display: none;
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 40;
+    pointer-events: none;
+  }
+
+  #tutorial-overlay.active {
+    display: block;
+  }
+
+  #tutorial-prompt {
+    position: absolute;
+    bottom: 100px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(6, 8, 24, 0.95);
+    border: 2px solid var(--energy-color);
+    border-radius: 12px;
+    padding: 18px 24px;
+    max-width: 340px;
+    width: calc(100% - 32px);
+    text-align: center;
+    pointer-events: auto;
+    backdrop-filter: blur(14px);
+    box-shadow: 0 0 40px rgba(0, 229, 255, 0.15);
+    animation: tutorialFadeIn 0.4s ease;
+  }
+
+  @keyframes tutorialFadeIn {
+    from { opacity: 0; transform: translateX(-50%) translateY(12px); }
+    to { opacity: 1; transform: translateX(-50%) translateY(0); }
+  }
+
+  #tutorial-prompt .tut-step {
+    font-family: 'Orbitron', monospace;
+    font-size: 9px;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  #tutorial-prompt .tut-text {
+    font-size: 15px;
+    line-height: 1.5;
+    margin-bottom: 10px;
+    color: var(--text);
+  }
+
+  #tutorial-prompt .tut-hint {
+    font-size: 12px;
+    color: var(--text-dim);
+    font-style: italic;
+  }
+
+  #tutorial-prompt .tut-hint kbd {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 12px;
+    color: var(--text);
+    font-style: normal;
+  }
+
+  #tutorial-skip {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 13px;
+    color: var(--text-dim);
+    background: none;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 4px;
+    padding: 4px 14px;
+    cursor: pointer;
+    margin-top: 10px;
+    transition: all 0.15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  #tutorial-skip:hover, #tutorial-skip:active {
+    color: var(--text);
+    border-color: rgba(255,255,255,0.3);
+  }
+
+  /* Pulsing ring drawn on canvas, but we also have a CSS highlight ring for UI elements */
+  .tut-highlight {
+    position: absolute;
+    border: 2px solid var(--energy-color);
+    border-radius: 50%;
+    pointer-events: none;
+    animation: tutPulse 1.5s ease-in-out infinite;
+  }
+
+  @keyframes tutPulse {
+    0%, 100% { box-shadow: 0 0 8px var(--energy-color), inset 0 0 8px rgba(0, 229, 255, 0.1); opacity: 0.8; }
+    50% { box-shadow: 0 0 20px var(--energy-color), inset 0 0 16px rgba(0, 229, 255, 0.2); opacity: 1; }
+  }
+
+  @media (max-width: 480px) {
+    #tutorial-prompt {
+      bottom: 80px;
+      padding: 14px 18px;
+      max-width: 320px;
+    }
+
+    #tutorial-prompt .tut-text {
+      font-size: 14px;
+    }
+  }
 </style>
 </head>
 <body>
@@ -648,6 +763,15 @@
     <div class="tech-row" style="margin-top: 10px;">
       <span style="color: #ff44ff;">Relay Tech</span>
       <span id="relay-status" style="color: var(--text-dim);">Locked</span>
+    </div>
+  </div>
+
+  <div id="tutorial-overlay">
+    <div id="tutorial-prompt">
+      <div class="tut-step" id="tut-step-label"></div>
+      <div class="tut-text" id="tut-text"></div>
+      <div class="tut-hint" id="tut-hint"></div>
+      <button id="tutorial-skip">SKIP TUTORIAL</button>
     </div>
   </div>
 
@@ -1993,6 +2117,7 @@ function upgradeHomeworld() {
 
   showNotification(`${def.name} Online!`, getHomeworldUpgradeDesc(), '#00ff88');
   addLog(`HOMEWORLD: Upgraded to Level ${homeworldLevel} — ${def.name}`, 'resource');
+  tutorialOnUpgrade();
   recomputeNetwork();
   updateHUD();
   return true;
@@ -2131,6 +2256,7 @@ function connectStar(from, to) {
     recomputeNetwork();
   }
 
+  tutorialOnConnect();
   updateHUD();
   return true;
 }
@@ -2841,6 +2967,7 @@ canvas.addEventListener('mousemove', (e) => {
     const dy = e.clientY - dragStart.y;
     camera.x = camStart.x + dx / camera.zoom;
     camera.y = camStart.y + dy / camera.zoom;
+    if (Math.hypot(dx, dy) > 20) tutorialOnPan();
     return;
   }
 
@@ -2873,6 +3000,7 @@ canvas.addEventListener('mouseup', (e) => {
 
   // Single click: select
   selectedStar = clicked;
+  tutorialOnSelect(clicked);
 });
 
 // Double-click: try to connect
@@ -2914,6 +3042,7 @@ canvas.addEventListener('wheel', (e) => {
   const newWorld = screenToWorld(e.clientX, e.clientY);
   camera.x += newWorld.x - world.x;
   camera.y += newWorld.y - world.y;
+  tutorialOnZoom();
 }, { passive: false });
 
 document.addEventListener('keydown', (e) => {
@@ -2964,6 +3093,7 @@ canvas.addEventListener('touchmove', (e) => {
     const dy = e.touches[0].clientY - touchStart.y;
     camera.x = camStart.x + dx / camera.zoom;
     camera.y = camStart.y + dy / camera.zoom;
+    if (Math.hypot(dx, dy) > 20) tutorialOnPan();
   } else if (e.touches.length === 2 && touchDist) {
     const newDist = Math.hypot(
       e.touches[0].clientX - e.touches[1].clientX,
@@ -2971,6 +3101,7 @@ canvas.addEventListener('touchmove', (e) => {
     );
     camera.zoom = Math.max(0.02, Math.min(5, camera.zoom * (newDist / touchDist)));
     touchDist = newDist;
+    tutorialOnZoom();
   }
   e.preventDefault();
 }, { passive: false });
@@ -3003,6 +3134,7 @@ canvas.addEventListener('touchend', (e) => {
       } else if (tapped) {
         // Single tap: select and show info
         selectedStar = tapped;
+        tutorialOnSelect(tapped);
       } else {
         // Tap empty space: deselect
         selectedStar = null;
@@ -3026,6 +3158,159 @@ canvas.addEventListener('touchend', (e) => {
   touchDist = null;
 });
 
+// ========== TUTORIAL ==========
+const tutorial = {
+  active: false,
+  step: 0,
+  highlightEl: null,
+  // Completion trackers
+  hasPanned: false,
+  hasZoomed: false,
+  hasSelected: false,
+  hasConnected: false,
+  hasUpgraded: false,
+};
+
+const TUTORIAL_STEPS = [
+  {
+    text: 'Welcome, Commander. This is your <strong style="color: var(--home-color)">Homeworld</strong> — the heart of your star network.',
+    hint: null,
+    check: () => true, // Auto-advance after delay
+    autoMs: 3000,
+  },
+  {
+    text: 'First, learn to <strong style="color: var(--energy-color)">navigate</strong>. Drag to pan around the starfield.',
+    hintDesktop: 'Click and drag to pan',
+    hintMobile: 'Touch and drag to pan',
+    check: () => tutorial.hasPanned,
+  },
+  {
+    text: 'Good. Now <strong style="color: var(--energy-color)">zoom in</strong> toward your homeworld.',
+    hintDesktop: 'Scroll wheel to zoom',
+    hintMobile: 'Pinch to zoom',
+    check: () => tutorial.hasZoomed,
+  },
+  {
+    text: 'See those nearby stars? <strong style="color: var(--energy-color)">Select</strong> one to scan it.',
+    hintDesktop: 'Click on a star near your homeworld',
+    hintMobile: 'Tap a star near your homeworld',
+    check: () => tutorial.hasSelected,
+  },
+  {
+    text: 'The star info shows resources and connection cost. Now <strong style="color: var(--energy-color)">connect</strong> it to your network!',
+    hintDesktop: '<kbd>Double-click</kbd> the star to connect',
+    hintMobile: 'Double-tap the star, or use the <kbd>⚡ CONNECT</kbd> button',
+    check: () => tutorial.hasConnected,
+  },
+  {
+    text: 'Energy flows back to your homeworld! Connect a few more stars to build up energy, then select your <strong style="color: var(--home-color)">Homeworld</strong> and <strong style="color: var(--home-color)">upgrade</strong> it.',
+    hintDesktop: 'Select homeworld, press <kbd>U</kbd> to upgrade',
+    hintMobile: 'Tap homeworld, then tap <kbd>⬆ UPGRADE</kbd>',
+    check: () => tutorial.hasUpgraded,
+  },
+  {
+    text: 'Your colony can now reach <strong>2 hops</strong> deep and branch through relay stars. Keep expanding!',
+    hint: null,
+    check: () => true,
+    autoMs: 4000,
+  },
+];
+
+function startTutorial() {
+  tutorial.active = true;
+  tutorial.step = 0;
+  tutorial.hasPanned = false;
+  tutorial.hasZoomed = false;
+  tutorial.hasSelected = false;
+  tutorial.hasConnected = false;
+  tutorial.hasUpgraded = false;
+  document.getElementById('tutorial-overlay').classList.add('active');
+  showTutorialStep();
+}
+
+function endTutorial() {
+  tutorial.active = false;
+  document.getElementById('tutorial-overlay').classList.remove('active');
+  if (tutorial.highlightEl) {
+    tutorial.highlightEl.remove();
+    tutorial.highlightEl = null;
+  }
+}
+
+function showTutorialStep() {
+  if (!tutorial.active || tutorial.step >= TUTORIAL_STEPS.length) {
+    endTutorial();
+    return;
+  }
+  const step = TUTORIAL_STEPS[tutorial.step];
+  const stepNum = tutorial.step + 1;
+  const total = TUTORIAL_STEPS.length;
+  document.getElementById('tut-step-label').textContent = `Step ${stepNum} of ${total}`;
+  document.getElementById('tut-text').innerHTML = step.text;
+
+  // Hint: pick desktop or mobile version
+  const hintEl = document.getElementById('tut-hint');
+  if (step.hint !== undefined) {
+    hintEl.innerHTML = step.hint || '';
+    hintEl.style.display = step.hint ? '' : 'none';
+  } else if (isMobileWidth()) {
+    hintEl.innerHTML = step.hintMobile || '';
+    hintEl.style.display = step.hintMobile ? '' : 'none';
+  } else {
+    hintEl.innerHTML = step.hintDesktop || '';
+    hintEl.style.display = step.hintDesktop ? '' : 'none';
+  }
+
+  // Re-trigger animation
+  const prompt = document.getElementById('tutorial-prompt');
+  prompt.style.animation = 'none';
+  prompt.offsetHeight; // reflow
+  prompt.style.animation = '';
+
+  // Auto-advance for steps with autoMs
+  if (step.autoMs) {
+    setTimeout(() => {
+      if (tutorial.active && tutorial.step < TUTORIAL_STEPS.length && TUTORIAL_STEPS[tutorial.step] === step) {
+        advanceTutorial();
+      }
+    }, step.autoMs);
+  }
+}
+
+function advanceTutorial() {
+  tutorial.step++;
+  if (tutorial.step >= TUTORIAL_STEPS.length) {
+    endTutorial();
+    addLog('Tutorial complete. The galaxy awaits!', 'tech');
+  } else {
+    showTutorialStep();
+  }
+}
+
+// Check tutorial completion each frame
+function updateTutorial() {
+  if (!tutorial.active) return;
+  const step = TUTORIAL_STEPS[tutorial.step];
+  if (step && !step.autoMs && step.check()) {
+    // Small delay so the action feels acknowledged
+    setTimeout(() => advanceTutorial(), 600);
+  }
+}
+
+// Tutorial event hooks — called from input handlers
+function tutorialOnPan() { if (tutorial.active) tutorial.hasPanned = true; }
+function tutorialOnZoom() { if (tutorial.active) tutorial.hasZoomed = true; }
+function tutorialOnSelect(star) { if (tutorial.active && star && !star.isHome) tutorial.hasSelected = true; }
+function tutorialOnConnect() { if (tutorial.active) tutorial.hasConnected = true; }
+function tutorialOnUpgrade() { if (tutorial.active) tutorial.hasUpgraded = true; }
+
+// Skip button
+document.getElementById('tutorial-skip').addEventListener('click', (e) => {
+  e.stopPropagation();
+  endTutorial();
+  addLog('Tutorial skipped. Explore at your own pace!', 'tech');
+});
+
 // ========== GAME LOOP ==========
 let lastTime = 0;
 
@@ -3038,6 +3323,7 @@ function gameLoop(timestamp) {
     updateEnergy(dt);
     updateParticles(dt);
     updateFlowParticles(dt);
+    updateTutorial();
     updateHUD();
   }
 
@@ -3073,8 +3359,7 @@ document.getElementById('start-btn').addEventListener('click', () => {
   hoveredStar = null;
   generateStars();
   gameRunning = true;
-  addLog('Welcome to Star Reach. Double-click nearby stars to connect them.', 'tech');
-  addLog('Outpost: direct links only. Click homeworld and press U to upgrade.', 'tech');
+  startTutorial();
   updateHUD();
 });
 
