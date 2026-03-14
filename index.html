@@ -430,6 +430,7 @@
     <strong style="color: var(--text); font-size: 12px;">Controls</strong><br>
     <kbd>Click</kbd> select a star<br>
     <kbd>Double-click</kbd> connect to star<br>
+    <kbd>U</kbd> upgrade homeworld<br>
     <kbd>H</kbd> upgrade to relay hub<br>
     <kbd>Scroll</kbd> zoom in/out<br>
     <kbd>Drag</kbd> pan the map
@@ -440,11 +441,16 @@
   <h1>STAR REACH</h1>
   <div class="subtitle">Expand your network across the galaxy</div>
   <div class="instructions-block">
-    <p>You begin on a single world with enough energy to reach a few nearby stars. Hover over stars to read sensor data. Double-click a star to connect it. The preview line shows exactly where the connection will go.</p>
-    <p>At first, all connections must run directly to your homeworld. Eventually, you'll discover <strong style="color: #ff44ff;">Relay Technology</strong> that lets you branch through connected worlds. Build <strong style="color: #00e5ff;">Relay Hubs</strong> (press H) at strategic stars to reset efficiency for nearby connections.</p>
-    <p><strong style="color: var(--energy-color);">Energy</strong> accumulates over time from your network. Spend it to build new connections.</p>
-    <p><strong style="color: var(--propulsion-color);">Propulsion tech</strong> extends your maximum connection range, letting you reach more distant stars.</p>
-    <p><strong style="color: var(--discovery-color);">Discoveries</strong> at some stars grant bonus tech: faster energy production or extended range.</p>
+    <p>You begin as a small <strong style="color: var(--home-color);">Outpost</strong> with enough energy to reach nearby stars. Double-click to connect. Hover for sensor data.</p>
+    <p><strong style="color: var(--home-color);">Upgrade your homeworld</strong> (select it, press U) to unlock new capabilities:</p>
+    <p style="padding-left: 12px; font-size: 13px; line-height: 1.6;">
+      <strong style="color: var(--home-color);">L2 Colony</strong> — 2-hop chains, relay branching<br>
+      <strong style="color: var(--home-color);">L3 Station</strong> — Unlimited hops, +10% efficiency<br>
+      <strong style="color: #00e5ff;">L4 Starbase</strong> — Build relay hubs (press H)<br>
+      <strong style="color: #ffcc00;">L5 Dyson Sphere</strong> — +20% efficiency, hub upgrades
+    </p>
+    <p><strong style="color: var(--energy-color);">Energy</strong> accumulates from your network. Spend it on connections and upgrades.</p>
+    <p><strong style="color: var(--discovery-color);">Discoveries</strong> grant bonus tech. <strong style="color: var(--propulsion-color);">Propulsion tech</strong> extends range.</p>
   </div>
   <button id="start-btn">LAUNCH</button>
 </div>
@@ -470,6 +476,22 @@ let hubCost = 500;
 const hubCostScaling = 200;
 let hubCount = 0;
 let homeworldLevel = 1;
+
+// Homeworld level definitions — each level gates capabilities and costs energy to reach
+const HOMEWORLD_LEVELS = [
+  null, // index 0 unused
+  { name: 'Outpost',       maxHops: 1,        relay: false, hubs: false, hubUpgrades: false, effBonus: 0,    upgradeCost: null }, // L1 start
+  { name: 'Colony',        maxHops: 2,        relay: true,  hubs: false, hubUpgrades: false, effBonus: 0,    upgradeCost: 200  }, // L2
+  { name: 'Station',       maxHops: Infinity, relay: true,  hubs: false, hubUpgrades: false, effBonus: 0.10, upgradeCost: 500  }, // L3
+  { name: 'Starbase',      maxHops: Infinity, relay: true,  hubs: true,  hubUpgrades: false, effBonus: 0.10, upgradeCost: 1200 }, // L4
+  { name: 'Dyson Sphere',  maxHops: Infinity, relay: true,  hubs: true,  hubUpgrades: true,  effBonus: 0.20, upgradeCost: 3000 }, // L5
+];
+const MAX_HOMEWORLD_LEVEL = HOMEWORLD_LEVELS.length - 1;
+
+function getHomeworldDef() {
+  return HOMEWORLD_LEVELS[Math.min(homeworldLevel, MAX_HOMEWORLD_LEVEL)];
+}
+
 let camera = { x: 0, y: 0, zoom: 1 };
 let isDragging = false;
 let dragStart = { x: 0, y: 0 };
@@ -899,7 +921,7 @@ function drawStars() {
 
     // Homeworld grows with tech level
     if (star.isHome) {
-      displaySize *= (1 + (homeworldLevel - 1) * 0.15);
+      displaySize *= (1 + (homeworldLevel - 1) * 0.2);
     }
 
     const isSelected = star === selectedStar;
@@ -1072,32 +1094,50 @@ function drawStars() {
       ctx.stroke();
     }
 
-    // Home marker - evolves with tech level
+    // Home marker — distinct visual per homeworld level
     if (star.isHome) {
-      const level = homeworldLevel || 1;
+      const level = homeworldLevel;
       const baseR = displaySize + 10;
 
-      // Level 1+: Inner rotating hex
-      ctx.save();
-      ctx.translate(s.x, s.y);
-      ctx.rotate(animTime * 0.3);
-      ctx.strokeStyle = '#00ff88';
-      ctx.lineWidth = 1.2;
-      ctx.globalAlpha = 0.5 + 0.15 * Math.sin(animTime * 1.5);
-      ctx.beginPath();
-      for (let i = 0; i <= 6; i++) {
-        const a = (i / 6) * Math.PI * 2;
-        const r = baseR;
-        if (i === 0) ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r);
-        else ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+      if (level === 1) {
+        // L1 OUTPOST: Simple rotating triangle — bare minimum
+        ctx.save();
+        ctx.translate(s.x, s.y);
+        ctx.rotate(animTime * 0.4);
+        ctx.strokeStyle = '#00ff88';
+        ctx.lineWidth = 1.2;
+        ctx.globalAlpha = 0.5 + 0.15 * Math.sin(animTime * 1.5);
+        ctx.beginPath();
+        for (let i = 0; i <= 3; i++) {
+          const a = (i / 3) * Math.PI * 2 - Math.PI / 2;
+          if (i === 0) ctx.moveTo(Math.cos(a) * baseR, Math.sin(a) * baseR);
+          else ctx.lineTo(Math.cos(a) * baseR, Math.sin(a) * baseR);
+        }
+        ctx.closePath();
+        ctx.stroke();
+        ctx.restore();
+        ctx.globalAlpha = 1;
       }
-      ctx.closePath();
-      ctx.stroke();
-      ctx.restore();
-      ctx.globalAlpha = 1;
 
-      // Level 2+: Outer pulsing ring
-      if (level >= 2) {
+      if (level === 2) {
+        // L2 COLONY: Rotating hex + pulsing ring
+        ctx.save();
+        ctx.translate(s.x, s.y);
+        ctx.rotate(animTime * 0.3);
+        ctx.strokeStyle = '#00ff88';
+        ctx.lineWidth = 1.2;
+        ctx.globalAlpha = 0.5 + 0.15 * Math.sin(animTime * 1.5);
+        ctx.beginPath();
+        for (let i = 0; i <= 6; i++) {
+          const a = (i / 6) * Math.PI * 2;
+          if (i === 0) ctx.moveTo(Math.cos(a) * baseR, Math.sin(a) * baseR);
+          else ctx.lineTo(Math.cos(a) * baseR, Math.sin(a) * baseR);
+        }
+        ctx.closePath();
+        ctx.stroke();
+        ctx.restore();
+        ctx.globalAlpha = 1;
+        // Pulsing ring
         const ringR = baseR + 6 + 2 * Math.sin(animTime * 2);
         ctx.strokeStyle = 'rgba(0, 255, 136, 0.3)';
         ctx.lineWidth = 1;
@@ -1106,69 +1146,203 @@ function drawStars() {
         ctx.stroke();
       }
 
-      // Level 3+: Orbiting defense/relay dots
-      if (level >= 3) {
+      if (level === 3) {
+        // L3 STATION: Hex + orbiting relay dots + energy field glow
+        ctx.save();
+        ctx.translate(s.x, s.y);
+        ctx.rotate(animTime * 0.3);
+        ctx.strokeStyle = '#00ff88';
+        ctx.lineWidth = 1.5;
+        ctx.globalAlpha = 0.6;
+        ctx.beginPath();
+        for (let i = 0; i <= 6; i++) {
+          const a = (i / 6) * Math.PI * 2;
+          if (i === 0) ctx.moveTo(Math.cos(a) * baseR, Math.sin(a) * baseR);
+          else ctx.lineTo(Math.cos(a) * baseR, Math.sin(a) * baseR);
+        }
+        ctx.closePath();
+        ctx.stroke();
+        ctx.restore();
+        ctx.globalAlpha = 1;
+        // Orbiting dots
         const orbitR = baseR + 14;
-        const dotCount = Math.min(level - 1, 6);
-        for (let i = 0; i < dotCount; i++) {
-          const a = animTime * 0.8 + (i / dotCount) * Math.PI * 2;
-          const dx = s.x + Math.cos(a) * orbitR;
-          const dy = s.y + Math.sin(a) * orbitR;
+        for (let i = 0; i < 4; i++) {
+          const a = animTime * 0.8 + (i / 4) * Math.PI * 2;
           ctx.fillStyle = '#00ff88';
           ctx.globalAlpha = 0.6;
           ctx.beginPath();
-          ctx.arc(dx, dy, 1.5 * camera.zoom, 0, Math.PI * 2);
+          ctx.arc(s.x + Math.cos(a) * orbitR, s.y + Math.sin(a) * orbitR, 1.5 * camera.zoom, 0, Math.PI * 2);
           ctx.fill();
         }
         ctx.globalAlpha = 1;
-      }
-
-      // Level 4+: Radiating energy field
-      if (level >= 4) {
-        const fieldR = baseR + 22 + 4 * Math.sin(animTime);
-        const grad = ctx.createRadialGradient(s.x, s.y, baseR, s.x, s.y, fieldR);
-        grad.addColorStop(0, 'rgba(0, 255, 136, 0.08)');
-        grad.addColorStop(1, 'transparent');
-        ctx.fillStyle = grad;
+        // Efficiency aura
+        const fieldR = baseR + 20 + 3 * Math.sin(animTime);
+        const grad3 = ctx.createRadialGradient(s.x, s.y, baseR, s.x, s.y, fieldR);
+        grad3.addColorStop(0, 'rgba(0, 255, 136, 0.06)');
+        grad3.addColorStop(1, 'transparent');
+        ctx.fillStyle = grad3;
         ctx.beginPath();
         ctx.arc(s.x, s.y, fieldR, 0, Math.PI * 2);
         ctx.fill();
       }
 
-      // Level 5+: Counter-rotating outer ring
-      if (level >= 5) {
+      if (level === 4) {
+        // L4 STARBASE: Double hex (inner + outer counter-rotating), orbiting dots, energy field
         ctx.save();
         ctx.translate(s.x, s.y);
-        ctx.rotate(-animTime * 0.5);
-        ctx.strokeStyle = 'rgba(0, 229, 255, 0.25)';
-        ctx.lineWidth = 0.8;
-        ctx.setLineDash([3, 8]);
+        ctx.rotate(animTime * 0.3);
+        ctx.strokeStyle = '#00ff88';
+        ctx.lineWidth = 1.5;
+        ctx.globalAlpha = 0.6;
         ctx.beginPath();
-        ctx.arc(0, 0, baseR + 28, 0, Math.PI * 2);
+        for (let i = 0; i <= 6; i++) {
+          const a = (i / 6) * Math.PI * 2;
+          if (i === 0) ctx.moveTo(Math.cos(a) * baseR, Math.sin(a) * baseR);
+          else ctx.lineTo(Math.cos(a) * baseR, Math.sin(a) * baseR);
+        }
+        ctx.closePath();
         ctx.stroke();
-        ctx.setLineDash([]);
         ctx.restore();
+        // Counter-rotating outer hex
+        ctx.save();
+        ctx.translate(s.x, s.y);
+        ctx.rotate(-animTime * 0.2);
+        ctx.strokeStyle = 'rgba(0, 229, 255, 0.35)';
+        ctx.lineWidth = 1;
+        const outerR = baseR + 12;
+        ctx.beginPath();
+        for (let i = 0; i <= 6; i++) {
+          const a = (i / 6) * Math.PI * 2;
+          if (i === 0) ctx.moveTo(Math.cos(a) * outerR, Math.sin(a) * outerR);
+          else ctx.lineTo(Math.cos(a) * outerR, Math.sin(a) * outerR);
+        }
+        ctx.closePath();
+        ctx.stroke();
+        ctx.restore();
+        ctx.globalAlpha = 1;
+        // Orbiting dots
+        const orbit4R = baseR + 20;
+        for (let i = 0; i < 6; i++) {
+          const a = animTime * 0.8 + (i / 6) * Math.PI * 2;
+          ctx.fillStyle = '#00e5ff';
+          ctx.globalAlpha = 0.6;
+          ctx.beginPath();
+          ctx.arc(s.x + Math.cos(a) * orbit4R, s.y + Math.sin(a) * orbit4R, 1.5 * camera.zoom, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+        // Energy field
+        const field4R = baseR + 26 + 4 * Math.sin(animTime);
+        const grad4 = ctx.createRadialGradient(s.x, s.y, baseR, s.x, s.y, field4R);
+        grad4.addColorStop(0, 'rgba(0, 229, 255, 0.08)');
+        grad4.addColorStop(1, 'transparent');
+        ctx.fillStyle = grad4;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, field4R, 0, Math.PI * 2);
+        ctx.fill();
       }
 
-      // Level 6+: Power arcs
-      if (level >= 6) {
-        const arcR = baseR + 18;
-        ctx.strokeStyle = 'rgba(0, 229, 255, 0.3)';
+      if (level >= 5) {
+        // L5 DYSON SPHERE: Multiple concentric rotating rings, power arcs, bright aura
+        // Inner structure
+        ctx.save();
+        ctx.translate(s.x, s.y);
+        ctx.rotate(animTime * 0.25);
+        ctx.strokeStyle = '#ffcc00';
+        ctx.lineWidth = 1.8;
+        ctx.globalAlpha = 0.7;
+        ctx.beginPath();
+        for (let i = 0; i <= 8; i++) {
+          const a = (i / 8) * Math.PI * 2;
+          if (i === 0) ctx.moveTo(Math.cos(a) * baseR, Math.sin(a) * baseR);
+          else ctx.lineTo(Math.cos(a) * baseR, Math.sin(a) * baseR);
+        }
+        ctx.closePath();
+        ctx.stroke();
+        ctx.restore();
+        ctx.globalAlpha = 1;
+
+        // Dyson ring 1 — tilted ellipse
+        const dysonR1 = baseR + 16;
+        ctx.save();
+        ctx.translate(s.x, s.y);
+        ctx.rotate(animTime * 0.15);
+        ctx.scale(1, 0.35);
+        ctx.strokeStyle = 'rgba(255, 204, 0, 0.4)';
         ctx.lineWidth = 1.5;
-        for (let i = 0; i < 3; i++) {
-          const aStart = animTime * 1.2 + (i / 3) * Math.PI * 2;
+        ctx.beginPath();
+        ctx.arc(0, 0, dysonR1, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+
+        // Dyson ring 2 — perpendicular
+        const dysonR2 = baseR + 18;
+        ctx.save();
+        ctx.translate(s.x, s.y);
+        ctx.rotate(-animTime * 0.12 + Math.PI / 3);
+        ctx.scale(1, 0.35);
+        ctx.strokeStyle = 'rgba(255, 180, 0, 0.3)';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.arc(0, 0, dysonR2, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+
+        // Dyson ring 3
+        const dysonR3 = baseR + 20;
+        ctx.save();
+        ctx.translate(s.x, s.y);
+        ctx.rotate(animTime * 0.1 + Math.PI * 2 / 3);
+        ctx.scale(1, 0.35);
+        ctx.strokeStyle = 'rgba(255, 220, 100, 0.25)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(0, 0, dysonR3, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+
+        // Power arcs
+        const arcR = baseR + 14;
+        ctx.strokeStyle = 'rgba(255, 200, 50, 0.35)';
+        ctx.lineWidth = 2;
+        for (let i = 0; i < 4; i++) {
+          const aStart = animTime * 1.5 + (i / 4) * Math.PI * 2;
           ctx.beginPath();
-          ctx.arc(s.x, s.y, arcR, aStart, aStart + 0.6);
+          ctx.arc(s.x, s.y, arcR, aStart, aStart + 0.5);
           ctx.stroke();
         }
+
+        // Bright golden aura
+        const auraR = baseR + 30 + 5 * Math.sin(animTime * 0.8);
+        const gradD = ctx.createRadialGradient(s.x, s.y, displaySize, s.x, s.y, auraR);
+        gradD.addColorStop(0, 'rgba(255, 204, 0, 0.12)');
+        gradD.addColorStop(0.5, 'rgba(255, 160, 0, 0.04)');
+        gradD.addColorStop(1, 'transparent');
+        ctx.fillStyle = gradD;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, auraR, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Orbiting energy nodes
+        const orbit5R = baseR + 24;
+        for (let i = 0; i < 8; i++) {
+          const a = animTime * 0.6 + (i / 8) * Math.PI * 2;
+          ctx.fillStyle = '#ffcc00';
+          ctx.globalAlpha = 0.5 + 0.2 * Math.sin(animTime * 3 + i);
+          ctx.beginPath();
+          ctx.arc(s.x + Math.cos(a) * orbit5R, s.y + Math.sin(a) * orbit5R, 2 * camera.zoom, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.globalAlpha = 1;
       }
 
       // Level label
       if (camera.zoom > 0.4) {
+        const def = getHomeworldDef();
         ctx.font = `${Math.max(8, 9 * camera.zoom)}px Orbitron`;
-        ctx.fillStyle = 'rgba(0, 255, 136, 0.5)';
+        ctx.fillStyle = level >= 5 ? 'rgba(255, 204, 0, 0.6)' : 'rgba(0, 255, 136, 0.5)';
         ctx.textAlign = 'center';
-        ctx.fillText(`LEVEL ${level}`, s.x, s.y + displaySize + 26);
+        ctx.fillText(def.name.toUpperCase(), s.x, s.y + displaySize + 26);
       }
     }
 
@@ -1434,10 +1608,12 @@ function updateFlowParticles(dt) {
 // ========== GAME LOGIC ==========
 
 // Efficiency curve with asymptotic floor — remote stars lose throughput
-// but never become worthless. Floor at 40%, smooth decay via 0.88^depth.
+// but never become worthless. Base floor at 40%, raised by homeworld level bonus.
 function getEfficiency(depth) {
   if (depth <= 0) return 1;
-  return 0.4 + 0.6 * Math.pow(0.88, depth);
+  const bonus = getHomeworldDef().effBonus;
+  const floor = 0.4 + bonus;
+  return Math.min(1, floor + (1 - floor) * Math.pow(0.88, depth));
 }
 
 // Connection cost scales with distance — bridges are an investment
@@ -1559,13 +1735,55 @@ function recomputeNetwork() {
   // Safety floor: prevent total economic death
   energyRate = Math.max(0.1, totalRate);
 
-  // Homeworld tech level based on cumulative progress
-  homeworldLevel = Math.floor(1 + Math.log2(1 + starsConnected) + Math.log2(1 + maxRange / 80));
+}
+
+// Upgrade homeworld to next level
+function upgradeHomeworld() {
+  if (homeworldLevel >= MAX_HOMEWORLD_LEVEL) {
+    addLog('Homeworld is at maximum level', 'tech');
+    return false;
+  }
+  const nextDef = HOMEWORLD_LEVELS[homeworldLevel + 1];
+  if (energy < nextDef.upgradeCost) {
+    addLog(`Not enough energy (${Math.floor(energy)}/${nextDef.upgradeCost})`, 'tech');
+    return false;
+  }
+  energy -= nextDef.upgradeCost;
+  homeworldLevel++;
+  const def = getHomeworldDef();
+
+  // Auto-unlock relay tech at level 2
+  if (def.relay && !hasRelayTech) {
+    hasRelayTech = true;
+    addLog('RELAY PROTOCOL: You can now branch through connected worlds', 'tech');
+  }
+
+  showNotification(`${def.name} Online!`, getHomeworldUpgradeDesc(), '#00ff88');
+  addLog(`HOMEWORLD: Upgraded to Level ${homeworldLevel} — ${def.name}`, 'resource');
+  recomputeNetwork();
+  updateHUD();
+  return true;
+}
+
+function getHomeworldUpgradeDesc() {
+  const def = getHomeworldDef();
+  const parts = [];
+  if (def.maxHops === Infinity) parts.push('Unlimited hops');
+  else parts.push(`Max ${def.maxHops} hop${def.maxHops > 1 ? 's' : ''}`);
+  if (def.effBonus > 0) parts.push(`+${Math.round(def.effBonus * 100)}% efficiency floor`);
+  if (def.hubs) parts.push('Relay hubs unlocked');
+  if (def.hubUpgrades) parts.push('Hub upgrades unlocked');
+  return parts.join(' · ');
 }
 
 // Upgrade a connected star to a relay hub
 function upgradeToHub(star) {
   if (!star || !star.connected || star.isHome || star.isHub) return false;
+  const def = getHomeworldDef();
+  if (!def.hubs) {
+    addLog('Relay hubs require Starbase (Level 4)', 'tech');
+    return false;
+  }
   const cost = hubCost + hubCount * hubCostScaling;
   if (energy < cost) {
     addLog(`Not enough energy for hub (${Math.floor(energy)}/${cost})`, 'tech');
@@ -1582,9 +1800,11 @@ function upgradeToHub(star) {
 }
 
 // Find the best "from" star to connect to a target, preferring homeworld
-// Without Relay Tech, ONLY homeworld can be a source (no branching)
+// Relay tech and max hop depth are gated by homeworld level
 function findBestConnection(target) {
   let candidates = [];
+  const def = getHomeworldDef();
+  const maxHops = def.maxHops;
 
   for (const s of stars) {
     if (!s.connected) continue;
@@ -1597,6 +1817,9 @@ function findBestConnection(target) {
     if (wouldCrossExisting(s, target)) continue;
 
     const depth = s.isHome ? 0 : (s.chainDepth || computeChainDepth(s));
+    // Enforce max hop limit from homeworld level
+    if (depth + 1 > maxHops) continue;
+
     candidates.push({ star: s, dist, depth });
   }
 
@@ -1688,6 +1911,7 @@ function updateHUD() {
   document.getElementById('hud-energy').textContent = Math.floor(energy);
   document.getElementById('hud-range').textContent = Math.round(maxRange);
   document.getElementById('hud-stars').textContent = starsConnected;
+  const def = getHomeworldDef();
   document.getElementById('hud-level').textContent = homeworldLevel;
   document.getElementById('energy-rate').textContent = energyRate.toFixed(1) + '/s';
   document.getElementById('range-val').textContent = Math.round(maxRange) + ' px';
@@ -1695,9 +1919,12 @@ function updateHUD() {
   document.getElementById('energy-bar').style.width = Math.min(100, energyRate / 5 * 100) + '%';
   document.getElementById('range-bar').style.width = Math.min(100, maxRange / 300 * 100) + '%';
   const relayEl = document.getElementById('relay-status');
-  if (hasRelayTech) {
-    relayEl.textContent = hubCount > 0 ? `${hubCount} Hub${hubCount > 1 ? 's' : ''}` : 'Active';
-    relayEl.style.color = hubCount > 0 ? '#00e5ff' : '#ff44ff';
+  if (def.hubs && hubCount > 0) {
+    relayEl.textContent = `${hubCount} Hub${hubCount > 1 ? 's' : ''}`;
+    relayEl.style.color = '#00e5ff';
+  } else if (hasRelayTech) {
+    relayEl.textContent = 'Active';
+    relayEl.style.color = '#ff44ff';
   } else {
     relayEl.textContent = 'Locked';
     relayEl.style.color = 'var(--text-dim)';
@@ -1969,8 +2196,22 @@ function showStarInfo(star, sx, sy) {
     // Full info for connected stars
     html += `<div class="star-detail"><span>Resource</span><span style="color:${star.resource.color}">${star.resource.name}</span></div>`;
     if (star.isHome) {
-      html += `<div class="star-detail"><span>Tech Level</span><span style="color: var(--home-color)">${homeworldLevel}</span></div>`;
+      const def = getHomeworldDef();
+      html += `<div class="star-detail"><span>Level ${homeworldLevel}</span><span style="color: var(--home-color)">${def.name}</span></div>`;
       html += `<div class="star-detail"><span>Network Rate</span><span style="color: var(--energy-color)">${energyRate.toFixed(1)}/s</span></div>`;
+      html += `<div class="star-detail"><span>Max Hops</span><span>${def.maxHops === Infinity ? 'Unlimited' : def.maxHops}</span></div>`;
+      if (def.effBonus > 0) {
+        html += `<div class="star-detail"><span>Eff. Bonus</span><span style="color: var(--home-color)">+${Math.round(def.effBonus * 100)}%</span></div>`;
+      }
+      html += `<div class="star-detail"><span>Relay Hubs</span><span style="color: ${def.hubs ? '#00e5ff' : 'var(--text-dim)'}">${def.hubs ? (hubCount > 0 ? hubCount + ' built' : 'Available') : 'Locked'}</span></div>`;
+      if (homeworldLevel < MAX_HOMEWORLD_LEVEL) {
+        const nextDef = HOMEWORLD_LEVELS[homeworldLevel + 1];
+        const canAfford = energy >= nextDef.upgradeCost;
+        html += `<div class="star-detail" style="margin-top: 8px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 6px;"><span style="color: var(--home-color)">Next: ${nextDef.name}</span><span style="color: ${canAfford ? 'var(--home-color)' : 'var(--danger)'}">${nextDef.upgradeCost}E</span></div>`;
+        html += `<div class="star-detail"><span style="font-size: 12px; color: var(--text-dim)">${canAfford ? 'Press U to upgrade' : 'Need more energy'}</span><span></span></div>`;
+      } else {
+        html += `<div class="star-detail" style="margin-top: 8px;"><span style="color: #00e5ff;">MAX LEVEL</span><span></span></div>`;
+      }
     } else {
       const depth = star.chainDepth || computeChainDepth(star);
       const eff = getEfficiency(depth);
@@ -1993,7 +2234,7 @@ function showStarInfo(star, sx, sy) {
     }
     if (star.isHub) {
       html += `<div class="star-detail"><span style="color: #00e5ff;">Status</span><span>RELAY HUB</span></div>`;
-    } else if (!star.isHome && hasRelayTech) {
+    } else if (!star.isHome && getHomeworldDef().hubs) {
       const hCost = hubCost + hubCount * hubCostScaling;
       const canAffordHub = energy >= hCost;
       html += `<div class="star-detail" style="margin-top: 6px;"><span style="color: #00e5ff;">Upgrade to Hub</span><span style="color: ${canAffordHub ? '#00e5ff' : 'var(--danger)'}">${hCost}E ${canAffordHub ? '(press H)' : ''}</span></div>`;
@@ -2053,8 +2294,8 @@ function showStarInfo(star, sx, sy) {
     } else if (nearest.star) {
       html += `<div class="star-detail" style="margin-top: 6px;"><span>Distance</span><span>${Math.round(nearest.dist)}</span></div>`;
       if (nearest.dist <= maxRange) {
+        const hwDef = getHomeworldDef();
         if (!hasRelayTech) {
-          // Check if a non-homeworld connected star could reach it
           let couldBranch = false;
           for (const s of stars) {
             if (!s.connected || s.isHome) continue;
@@ -2062,10 +2303,12 @@ function showStarInfo(star, sx, sy) {
             if (d <= maxRange && !wouldCrossExisting(s, star)) { couldBranch = true; break; }
           }
           if (couldBranch) {
-            html += `<div class="star-detail"><span style="color: #ff44ff; font-size: 13px;">Needs Relay Tech to branch</span><span></span></div>`;
+            html += `<div class="star-detail"><span style="color: #ff44ff; font-size: 13px;">Needs Colony (L2) or Relay Tech</span><span></span></div>`;
           } else {
             html += `<div class="star-detail"><span style="color: var(--danger); font-size: 13px;">Blocked: lines would cross</span><span></span></div>`;
           }
+        } else if (hwDef.maxHops < Infinity) {
+          html += `<div class="star-detail"><span style="color: var(--propulsion-color); font-size: 13px;">Exceeds max ${hwDef.maxHops} hop${hwDef.maxHops > 1 ? 's' : ''} (upgrade homeworld)</span><span></span></div>`;
         } else {
           html += `<div class="star-detail"><span style="color: var(--danger); font-size: 13px;">Blocked: all routes cross</span><span></span></div>`;
         }
@@ -2100,11 +2343,10 @@ function showConnectionCost(star, sx, sy) {
   const best = findBestConnection(star);
 
   if (!best) {
-    // Check if just out of range vs blocked vs needs relay tech
     const nearest = nearestConnectedStar(star);
+    const hwDef = getHomeworldDef();
     if (nearest.star && nearest.dist <= maxRange) {
       if (!hasRelayTech) {
-        // Check if branching would solve it
         let couldBranch = false;
         for (const s of stars) {
           if (!s.connected || s.isHome) continue;
@@ -2112,12 +2354,15 @@ function showConnectionCost(star, sx, sy) {
           if (d <= maxRange && !wouldCrossExisting(s, star)) { couldBranch = true; break; }
         }
         if (couldBranch) {
-          el.textContent = `NEEDS RELAY TECH`;
+          el.textContent = `NEEDS COLONY (L2) OR RELAY TECH`;
           el.className = 'too-far';
         } else {
           el.textContent = `BLOCKED (lines would cross)`;
           el.className = 'cant-afford';
         }
+      } else if (hwDef.maxHops < Infinity) {
+        el.textContent = `MAX ${hwDef.maxHops} HOP${hwDef.maxHops > 1 ? 'S' : ''} (upgrade homeworld)`;
+        el.className = 'too-far';
       } else {
         el.textContent = `BLOCKED (all routes cross)`;
         el.className = 'cant-afford';
@@ -2305,9 +2550,12 @@ document.addEventListener('keydown', (e) => {
     camera.zoom = Math.max(0.02, camera.zoom * 0.87);
   }
   if ((e.key === 'h' || e.key === 'H') && selectedStar) {
-    if (selectedStar.connected && !selectedStar.isHome && !selectedStar.isHub && hasRelayTech) {
+    if (selectedStar.connected && !selectedStar.isHome && !selectedStar.isHub && getHomeworldDef().hubs) {
       upgradeToHub(selectedStar);
     }
+  }
+  if ((e.key === 'u' || e.key === 'U') && selectedStar && selectedStar.isHome) {
+    upgradeHomeworld();
   }
 });
 
@@ -2419,7 +2667,7 @@ document.getElementById('start-btn').addEventListener('click', () => {
   generateStars();
   gameRunning = true;
   addLog('Welcome to Star Reach. Double-click nearby stars to connect them.', 'tech');
-  addLog('All connections must go direct to homeworld... for now.', 'tech');
+  addLog('Outpost: direct links only. Click homeworld and press U to upgrade.', 'tech');
   updateHUD();
 });
 
