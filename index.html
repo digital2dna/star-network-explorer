@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Star Network Explorer</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&display=swap');
@@ -38,6 +38,7 @@
     display: block;
     position: absolute;
     top: 0; left: 0;
+    touch-action: none;
   }
 
   #ui-overlay {
@@ -363,6 +364,230 @@
     background: rgba(0, 229, 255, 0.2);
     box-shadow: 0 0 24px rgba(0, 229, 255, 0.3);
   }
+
+  /* Mobile-only elements — hidden on desktop by default */
+  #mobile-star-info {
+    display: none;
+  }
+
+  #mobile-actions {
+    display: none;
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    gap: 12px;
+    z-index: 30;
+  }
+
+  .mobile-btn {
+    font-family: 'Orbitron', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    padding: 12px 18px;
+    border-radius: 8px;
+    border: 2px solid;
+    background: rgba(10, 12, 30, 0.9);
+    backdrop-filter: blur(12px);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .mobile-btn:active {
+    transform: scale(0.95);
+  }
+
+  .mobile-btn.connect {
+    border-color: var(--energy-color);
+    color: var(--energy-color);
+  }
+
+  .mobile-btn.upgrade-hw {
+    border-color: var(--home-color);
+    color: var(--home-color);
+  }
+
+  .mobile-btn.upgrade-hub {
+    border-color: #00e5ff;
+    color: #00e5ff;
+  }
+
+  .mobile-btn[disabled] {
+    opacity: 0.35;
+    pointer-events: none;
+  }
+
+  /* Mobile bottom sheet for star info */
+  #mobile-star-info {
+    display: none;
+    position: absolute;
+    bottom: 72px;
+    left: 8px;
+    right: 8px;
+    background: var(--panel-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 16px;
+    backdrop-filter: blur(14px);
+    font-size: 14px;
+    z-index: 28;
+    max-height: 40vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  #mobile-star-info .star-name {
+    font-family: 'Orbitron', monospace;
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 6px;
+    letter-spacing: 0.5px;
+  }
+
+  #mobile-star-info .star-detail {
+    display: flex;
+    justify-content: space-between;
+    margin: 3px 0;
+    font-size: 13px;
+  }
+
+  #mobile-star-info .star-detail span:first-child {
+    color: var(--text-dim);
+  }
+
+  /* ========== MOBILE BREAKPOINT (<480px) ========== */
+  @media (max-width: 480px) {
+    /* Compact HUD: icons + numbers only, no labels */
+    #hud {
+      top: 8px;
+      padding: 6px 12px;
+      gap: 14px;
+      border-radius: 6px;
+    }
+
+    .hud-item {
+      gap: 5px;
+      font-size: 12px;
+    }
+
+    .hud-label {
+      display: none;
+    }
+
+    .hud-value {
+      min-width: 32px;
+    }
+
+    .hud-icon {
+      width: 8px;
+      height: 8px;
+    }
+
+    /* Hide desktop panels */
+    #tech-panel {
+      display: none;
+    }
+
+    #instructions {
+      display: none;
+    }
+
+    /* Star info tooltip hidden on mobile — replaced by bottom sheet */
+    #star-info {
+      display: none !important;
+    }
+
+    #connection-cost {
+      display: none !important;
+    }
+
+    /* Show mobile action bar */
+    #mobile-actions {
+      display: flex;
+    }
+
+    /* Event log: top-left, below HUD, compact */
+    #event-log {
+      top: 52px;
+      bottom: auto;
+      left: 8px;
+      max-width: 280px;
+    }
+
+    .log-entry {
+      padding: 4px 8px;
+      font-size: 11px;
+    }
+
+    /* Notifications smaller */
+    .notification {
+      font-size: 14px;
+      padding: 10px 20px;
+    }
+
+    /* Start screen scrollable */
+    #start-screen {
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      justify-content: flex-start;
+      padding: 40px 20px;
+    }
+
+    #start-screen h1 {
+      font-size: 24px;
+      letter-spacing: 2px;
+    }
+
+    #start-screen .subtitle {
+      font-size: 11px;
+      margin-bottom: 24px;
+    }
+
+    #start-screen .instructions-block {
+      max-width: 100%;
+      font-size: 13px;
+      margin-bottom: 24px;
+    }
+
+    #start-btn {
+      padding: 14px 40px;
+      margin-bottom: 40px;
+    }
+  }
+
+  /* ========== TABLET BREAKPOINT (481-768px) ========== */
+  @media (min-width: 481px) and (max-width: 768px) {
+    #tech-panel {
+      top: 70px;
+      right: 8px;
+      padding: 10px 12px;
+      font-size: 11px;
+      min-width: 140px;
+    }
+
+    #instructions {
+      display: none;
+    }
+
+    #mobile-actions {
+      display: flex;
+    }
+
+    #star-info {
+      display: none !important;
+    }
+
+    #connection-cost {
+      display: none !important;
+    }
+
+    #event-log {
+      max-width: 300px;
+    }
+  }
 </style>
 </head>
 <body>
@@ -424,6 +649,14 @@
       <span style="color: #ff44ff;">Relay Tech</span>
       <span id="relay-status" style="color: var(--text-dim);">Locked</span>
     </div>
+  </div>
+
+  <div id="mobile-star-info"></div>
+
+  <div id="mobile-actions">
+    <button class="mobile-btn connect" id="mob-connect" disabled>⚡ CONNECT</button>
+    <button class="mobile-btn upgrade-hw" id="mob-upgrade-hw" disabled>⬆ UPGRADE</button>
+    <button class="mobile-btn upgrade-hub" id="mob-upgrade-hub" disabled>🔷 HUB</button>
   </div>
 
   <div id="instructions">
@@ -1929,6 +2162,8 @@ function updateHUD() {
     relayEl.textContent = 'Locked';
     relayEl.style.color = 'var(--text-dim)';
   }
+  // Keep mobile buttons in sync
+  if (isMobileWidth()) updateMobileActions();
 }
 
 // ========== OBSERVATION TEXT ENGINE ==========
@@ -2431,13 +2666,154 @@ function showNotification(title, desc, color) {
   setTimeout(() => notif.remove(), 2000);
 }
 
+// ========== MOBILE SUPPORT ==========
+const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+const isMobileWidth = () => window.innerWidth <= 768;
+
+// Show star info in mobile bottom sheet
+function showMobileStarInfo(star) {
+  const el = document.getElementById('mobile-star-info');
+  if (!star || !isMobileWidth()) { el.style.display = 'none'; return; }
+
+  // Reuse the same HTML generation from showStarInfo
+  let html = `<div class="star-name" style="color: ${star.connected ? star.color : '#8899bb'}">${star.name}</div>`;
+
+  if (star.connected) {
+    html += `<div class="star-detail"><span>Resource</span><span style="color:${star.resource.color}">${star.resource.name}</span></div>`;
+    if (star.isHome) {
+      const def = getHomeworldDef();
+      html += `<div class="star-detail"><span>Level ${homeworldLevel}</span><span style="color: var(--home-color)">${def.name}</span></div>`;
+      html += `<div class="star-detail"><span>Network Rate</span><span style="color: var(--energy-color)">${energyRate.toFixed(1)}/s</span></div>`;
+      html += `<div class="star-detail"><span>Max Hops</span><span>${def.maxHops === Infinity ? 'Unlimited' : def.maxHops}</span></div>`;
+      if (homeworldLevel < MAX_HOMEWORLD_LEVEL) {
+        const nextDef = HOMEWORLD_LEVELS[homeworldLevel + 1];
+        html += `<div class="star-detail"><span style="color: var(--home-color)">Next: ${nextDef.name}</span><span>${nextDef.upgradeCost}E</span></div>`;
+      }
+    } else {
+      const depth = star.chainDepth || computeChainDepth(star);
+      const eff = getEfficiency(depth);
+      const upkeep = star.resource.upkeep || 0;
+      if (upkeep > 0) {
+        html += `<div class="star-detail"><span style="color: var(--danger)">INHOSPITABLE</span><span style="color: var(--danger)">${star.resource.name}</span></div>`;
+      } else {
+        html += `<div class="star-detail"><span>Output</span><span>+${star.resource.energyBonus.toFixed(2)}/s</span></div>`;
+      }
+      html += `<div class="star-detail"><span>Hops</span><span>${depth}</span></div>`;
+      html += `<div class="star-detail"><span>Efficiency</span><span style="color: ${eff >= 0.7 ? 'var(--home-color)' : eff >= 0.5 ? 'var(--propulsion-color)' : 'var(--danger)'}">${Math.round(eff*100)}%</span></div>`;
+    }
+    if (star.isHub) {
+      html += `<div class="star-detail"><span style="color: #00e5ff;">RELAY HUB</span><span></span></div>`;
+    }
+  } else {
+    // Unconnected — show observation + connection info
+    const netDist = nearestConnectedStar(star).dist;
+    const observationRange = maxRange * 3;
+    if (star.resource.upkeep && netDist <= observationRange) {
+      html += `<div class="star-detail"><span style="color: var(--danger)">INHOSPITABLE</span><span style="color: var(--danger)">${star.resource.name}</span></div>`;
+    }
+    if (netDist <= observationRange) {
+      const obs = getObservationText(star);
+      const obsColor = obs.tier === 2 ? '#ddaaff' : obs.tier === 1 ? '#88aadd' : 'var(--text-dim)';
+      html += `<div style="color: ${obsColor}; font-style: italic; font-size: 12px; margin: 4px 0;">"${obs.text}"</div>`;
+    }
+    const best = findBestConnection(star);
+    if (best) {
+      const cost = getConnectionCost(best.star, star);
+      const hops = best.depth + 1;
+      const eff = Math.round(getEfficiency(hops) * 100);
+      html += `<div class="star-detail"><span>Via ${best.star.isHome ? 'HOME' : best.star.name}</span><span>${cost}E · ${eff}%</span></div>`;
+    } else {
+      html += `<div class="star-detail"><span style="color: var(--text-dim)">No route available</span><span></span></div>`;
+    }
+  }
+
+  el.innerHTML = html;
+  el.style.display = 'block';
+}
+
+// Update mobile action button states based on selection
+function updateMobileActions() {
+  if (!isMobileWidth()) return;
+  const connectBtn = document.getElementById('mob-connect');
+  const upgradeHwBtn = document.getElementById('mob-upgrade-hw');
+  const hubBtn = document.getElementById('mob-upgrade-hub');
+
+  // Connect: enabled if selected unconnected star has a valid route
+  if (selectedStar && !selectedStar.connected) {
+    const best = findBestConnection(selectedStar);
+    if (best) {
+      const cost = getConnectionCost(best.star, selectedStar);
+      connectBtn.disabled = energy < cost;
+      connectBtn.textContent = `⚡ ${cost}E`;
+    } else {
+      connectBtn.disabled = true;
+      connectBtn.textContent = '⚡ CONNECT';
+    }
+  } else {
+    connectBtn.disabled = true;
+    connectBtn.textContent = '⚡ CONNECT';
+  }
+
+  // Upgrade HW: enabled if homeworld selected and can afford
+  if (selectedStar && selectedStar.isHome && homeworldLevel < MAX_HOMEWORLD_LEVEL) {
+    const nextDef = HOMEWORLD_LEVELS[homeworldLevel + 1];
+    upgradeHwBtn.disabled = energy < nextDef.upgradeCost;
+    upgradeHwBtn.textContent = `⬆ ${nextDef.upgradeCost}E`;
+    upgradeHwBtn.style.display = '';
+  } else {
+    upgradeHwBtn.style.display = 'none';
+  }
+
+  // Hub: enabled if connected non-home star selected, hubs unlocked
+  if (selectedStar && selectedStar.connected && !selectedStar.isHome && !selectedStar.isHub && getHomeworldDef().hubs) {
+    const hCost = hubCost + hubCount * hubCostScaling;
+    hubBtn.disabled = energy < hCost;
+    hubBtn.textContent = `🔷 ${hCost}E`;
+    hubBtn.style.display = '';
+  } else {
+    hubBtn.style.display = 'none';
+  }
+}
+
+// Wire mobile action button click handlers
+document.getElementById('mob-connect').addEventListener('click', (e) => {
+  e.stopPropagation();
+  if (!selectedStar || selectedStar.connected) return;
+  const best = findBestConnection(selectedStar);
+  if (!best) return;
+  const cost = getConnectionCost(best.star, selectedStar);
+  if (energy < cost) return;
+  const success = connectStar(best.star, selectedStar);
+  if (success) {
+    showMobileStarInfo(selectedStar);
+    updateMobileActions();
+  }
+});
+
+document.getElementById('mob-upgrade-hw').addEventListener('click', (e) => {
+  e.stopPropagation();
+  if (upgradeHomeworld()) {
+    showMobileStarInfo(selectedStar);
+    updateMobileActions();
+  }
+});
+
+document.getElementById('mob-upgrade-hub').addEventListener('click', (e) => {
+  e.stopPropagation();
+  if (selectedStar && upgradeToHub(selectedStar)) {
+    showMobileStarInfo(selectedStar);
+    updateMobileActions();
+  }
+});
+
 // ========== INPUT ==========
 let mouseScreen = { x: 0, y: 0 };
 
 function getStarAtScreen(sx, sy) {
   const world = screenToWorld(sx, sy);
   let closest = null;
-  let closestDist = 20 / camera.zoom; // Hit radius in world space
+  const hitRadius = (isTouchDevice ? 35 : 20) / camera.zoom;
+  let closestDist = hitRadius;
 
   for (const star of stars) {
     const d = Math.hypot(star.x - world.x, star.y - world.y);
@@ -2559,9 +2935,11 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// Touch support
+// Touch support with double-tap detection
 let touchStart = null;
 let touchDist = null;
+let lastTapTime = 0;
+let lastTapStar = null;
 
 canvas.addEventListener('touchstart', (e) => {
   if (!gameRunning) return;
@@ -2570,6 +2948,7 @@ canvas.addEventListener('touchstart', (e) => {
     camStart = { x: camera.x, y: camera.y };
     isDragging = true;
   } else if (e.touches.length === 2) {
+    isDragging = false;
     touchDist = Math.hypot(
       e.touches[0].clientX - e.touches[1].clientX,
       e.touches[0].clientY - e.touches[1].clientY
@@ -2602,16 +2981,44 @@ canvas.addEventListener('touchend', (e) => {
     const t = e.changedTouches[0];
     const moved = Math.hypot(t.clientX - touchStart.x, t.clientY - touchStart.y);
     if (moved < 15) {
-      // Tap
-      const clicked = getStarAtScreen(t.clientX, t.clientY);
-      if (!clicked) {
-        selectedStar = null;
-      } else if (selectedStar && selectedStar !== clicked && selectedStar.connected && !clicked.connected) {
-        const success = connectStar(selectedStar, clicked);
-        if (success) selectedStar = clicked;
+      // Tap detected
+      const tapped = getStarAtScreen(t.clientX, t.clientY);
+      const now = Date.now();
+      const isDoubleTap = (now - lastTapTime < 350) && (lastTapStar === tapped) && tapped;
+
+      if (isDoubleTap && tapped && !tapped.connected) {
+        // Double-tap: connect star (same as desktop dblclick)
+        const best = findBestConnection(tapped);
+        if (best) {
+          const cost = getConnectionCost(best.star, tapped);
+          if (energy >= cost) {
+            const success = connectStar(best.star, tapped);
+            if (success) selectedStar = tapped;
+          } else {
+            addLog(`Not enough energy (${Math.floor(energy)}/${cost})`, 'tech');
+          }
+        } else {
+          addLog(`No valid connection to ${tapped.name}`, 'tech');
+        }
+      } else if (tapped) {
+        // Single tap: select and show info
+        selectedStar = tapped;
       } else {
-        selectedStar = clicked;
+        // Tap empty space: deselect
+        selectedStar = null;
+        if (isMobileWidth()) {
+          document.getElementById('mobile-star-info').style.display = 'none';
+        }
       }
+
+      // Update mobile UI
+      if (isMobileWidth()) {
+        showMobileStarInfo(selectedStar);
+        updateMobileActions();
+      }
+
+      lastTapTime = now;
+      lastTapStar = tapped;
     }
   }
   isDragging = false;
