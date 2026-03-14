@@ -1,0 +1,2429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Star Network Explorer</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #060612;
+    --panel-bg: rgba(10, 12, 30, 0.85);
+    --border: rgba(80, 140, 255, 0.2);
+    --energy-color: #00e5ff;
+    --propulsion-color: #ff6b35;
+    --discovery-color: #ffe44d;
+    --line-color: rgba(80, 160, 255, 0.6);
+    --line-glow: rgba(80, 160, 255, 0.3);
+    --home-color: #00ff88;
+    --text: #c8d8f0;
+    --text-dim: #5a6a8a;
+    --danger: #ff3355;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Rajdhani', sans-serif;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+    cursor: crosshair;
+  }
+
+  canvas {
+    display: block;
+    position: absolute;
+    top: 0; left: 0;
+  }
+
+  #ui-overlay {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  #ui-overlay > * {
+    pointer-events: auto;
+  }
+
+  /* Top HUD */
+  #hud {
+    position: absolute;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 24px;
+    background: var(--panel-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 24px;
+    backdrop-filter: blur(12px);
+    font-family: 'Orbitron', monospace;
+    z-index: 20;
+  }
+
+  .hud-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    letter-spacing: 0.5px;
+  }
+
+  .hud-icon {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+  }
+
+  .hud-icon.energy { background: var(--energy-color); box-shadow: 0 0 8px var(--energy-color); }
+  .hud-icon.propulsion { background: var(--propulsion-color); box-shadow: 0 0 8px var(--propulsion-color); }
+  .hud-icon.stars { background: var(--discovery-color); box-shadow: 0 0 8px var(--discovery-color); }
+
+  .hud-value {
+    font-weight: 700;
+    min-width: 48px;
+  }
+
+  .hud-label {
+    color: var(--text-dim);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  /* Star info tooltip */
+  #star-info {
+    position: absolute;
+    display: none;
+    background: var(--panel-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 16px;
+    backdrop-filter: blur(12px);
+    font-size: 15px;
+    min-width: 230px;
+    max-width: 320px;
+    z-index: 30;
+    pointer-events: none;
+  }
+
+  #star-info .star-name {
+    font-family: 'Orbitron', monospace;
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    letter-spacing: 0.5px;
+  }
+
+  #star-info .star-detail {
+    display: flex;
+    justify-content: space-between;
+    margin: 4px 0;
+    font-size: 14px;
+  }
+
+  #star-info .star-detail span:first-child {
+    color: var(--text-dim);
+  }
+
+  /* Connection preview */
+  #connection-cost {
+    position: absolute;
+    display: none;
+    font-family: 'Orbitron', monospace;
+    font-size: 12px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    z-index: 25;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+
+  #connection-cost.can-afford {
+    background: rgba(0, 229, 255, 0.15);
+    border: 1px solid rgba(0, 229, 255, 0.4);
+    color: var(--energy-color);
+  }
+
+  #connection-cost.too-far {
+    background: rgba(255, 107, 53, 0.15);
+    border: 1px solid rgba(255, 107, 53, 0.4);
+    color: var(--propulsion-color);
+  }
+
+  #connection-cost.cant-afford {
+    background: rgba(255, 51, 85, 0.15);
+    border: 1px solid rgba(255, 51, 85, 0.4);
+    color: var(--danger);
+  }
+
+  /* Event log */
+  #event-log {
+    position: absolute;
+    bottom: 16px;
+    left: 16px;
+    max-width: 360px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    z-index: 20;
+  }
+
+  .log-entry {
+    background: var(--panel-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 6px 12px;
+    font-size: 12px;
+    backdrop-filter: blur(8px);
+    animation: logFadeIn 0.3s ease;
+    transition: opacity 0.5s ease;
+  }
+
+  .log-entry.fading {
+    opacity: 0;
+  }
+
+  @keyframes logFadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .log-discovery { border-left: 3px solid var(--discovery-color); }
+  .log-resource { border-left: 3px solid var(--energy-color); }
+  .log-tech { border-left: 3px solid var(--propulsion-color); }
+
+  /* Right panel - tech/range indicator */
+  #tech-panel {
+    position: absolute;
+    top: 80px;
+    right: 16px;
+    background: var(--panel-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    backdrop-filter: blur(12px);
+    font-size: 12px;
+    min-width: 160px;
+    z-index: 20;
+  }
+
+  #tech-panel h3 {
+    font-family: 'Orbitron', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: 10px;
+  }
+
+  .tech-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 6px 0;
+  }
+
+  .tech-bar {
+    width: 80px;
+    height: 4px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .tech-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.4s ease;
+  }
+
+  .tech-bar-fill.energy { background: var(--energy-color); }
+  .tech-bar-fill.propulsion { background: var(--propulsion-color); }
+
+  /* Instructions overlay */
+  #instructions {
+    position: absolute;
+    bottom: 16px;
+    right: 16px;
+    background: var(--panel-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 16px;
+    backdrop-filter: blur(12px);
+    font-size: 13px;
+    color: var(--text-dim);
+    max-width: 220px;
+    line-height: 1.6;
+    z-index: 20;
+  }
+
+  #instructions kbd {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 13px;
+    color: var(--text);
+  }
+
+  /* Notification flash */
+  .notification {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-family: 'Orbitron', monospace;
+    font-size: 16px;
+    font-weight: 700;
+    padding: 12px 28px;
+    border-radius: 6px;
+    z-index: 50;
+    animation: notifPulse 1.8s ease forwards;
+    pointer-events: none;
+  }
+
+  @keyframes notifPulse {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+    15% { opacity: 1; transform: translate(-50%, -50%) scale(1.05); }
+    25% { transform: translate(-50%, -50%) scale(1); }
+    75% { opacity: 1; }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
+  }
+
+  /* Start screen */
+  #start-screen {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(6, 6, 18, 0.95);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    backdrop-filter: blur(4px);
+  }
+
+  #start-screen h1 {
+    font-family: 'Orbitron', monospace;
+    font-size: 36px;
+    font-weight: 900;
+    letter-spacing: 4px;
+    margin-bottom: 8px;
+    background: linear-gradient(135deg, var(--energy-color), #4080ff, var(--propulsion-color));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  #start-screen .subtitle {
+    font-size: 14px;
+    color: var(--text-dim);
+    margin-bottom: 40px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  #start-screen .instructions-block {
+    max-width: 460px;
+    text-align: left;
+    margin-bottom: 32px;
+    line-height: 1.8;
+    font-size: 14px;
+  }
+
+  #start-screen .instructions-block p {
+    margin-bottom: 10px;
+  }
+
+  #start-btn {
+    font-family: 'Orbitron', monospace;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 14px 48px;
+    border: 2px solid var(--energy-color);
+    background: rgba(0, 229, 255, 0.08);
+    color: var(--energy-color);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  #start-btn:hover {
+    background: rgba(0, 229, 255, 0.2);
+    box-shadow: 0 0 24px rgba(0, 229, 255, 0.3);
+  }
+</style>
+</head>
+<body>
+<canvas id="game-canvas"></canvas>
+
+<div id="ui-overlay">
+  <div id="hud">
+    <div class="hud-item">
+      <div class="hud-icon energy"></div>
+      <div>
+        <div class="hud-value" id="hud-energy">0</div>
+        <div class="hud-label">Energy</div>
+      </div>
+    </div>
+    <div class="hud-item">
+      <div class="hud-icon propulsion"></div>
+      <div>
+        <div class="hud-value" id="hud-range">80</div>
+        <div class="hud-label">Range</div>
+      </div>
+    </div>
+    <div class="hud-item">
+      <div class="hud-icon stars"></div>
+      <div>
+        <div class="hud-value" id="hud-stars">1</div>
+        <div class="hud-label">Stars</div>
+      </div>
+    </div>
+    <div class="hud-item">
+      <div class="hud-icon" style="background: var(--home-color); box-shadow: 0 0 8px var(--home-color);"></div>
+      <div>
+        <div class="hud-value" id="hud-level">1</div>
+        <div class="hud-label">HW Level</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="star-info"></div>
+  <div id="connection-cost"></div>
+  <div id="event-log"></div>
+
+  <div id="tech-panel">
+    <h3>Systems</h3>
+    <div class="tech-row">
+      <span style="color: var(--energy-color);">Energy Rate</span>
+      <span id="energy-rate">1.0/s</span>
+    </div>
+    <div class="tech-bar"><div class="tech-bar-fill energy" id="energy-bar" style="width: 10%"></div></div>
+    <div class="tech-row" style="margin-top: 10px;">
+      <span style="color: var(--propulsion-color);">Max Range</span>
+      <span id="range-val">80 px</span>
+    </div>
+    <div class="tech-bar"><div class="tech-bar-fill propulsion" id="range-bar" style="width: 10%"></div></div>
+    <div class="tech-row" style="margin-top: 10px;">
+      <span style="color: var(--text-dim);">Line Cost</span>
+      <span id="line-cost-val">50 E</span>
+    </div>
+    <div class="tech-row" style="margin-top: 10px;">
+      <span style="color: #ff44ff;">Relay Tech</span>
+      <span id="relay-status" style="color: var(--text-dim);">Locked</span>
+    </div>
+  </div>
+
+  <div id="instructions">
+    <strong style="color: var(--text); font-size: 12px;">Controls</strong><br>
+    <kbd>Click</kbd> select a star<br>
+    <kbd>Double-click</kbd> connect to star<br>
+    <kbd>H</kbd> upgrade to relay hub<br>
+    <kbd>Scroll</kbd> zoom in/out<br>
+    <kbd>Drag</kbd> pan the map
+  </div>
+</div>
+
+<div id="start-screen">
+  <h1>STAR REACH</h1>
+  <div class="subtitle">Expand your network across the galaxy</div>
+  <div class="instructions-block">
+    <p>You begin on a single world with enough energy to reach a few nearby stars. Hover over stars to read sensor data. Double-click a star to connect it. The preview line shows exactly where the connection will go.</p>
+    <p>At first, all connections must run directly to your homeworld. Eventually, you'll discover <strong style="color: #ff44ff;">Relay Technology</strong> that lets you branch through connected worlds. Build <strong style="color: #00e5ff;">Relay Hubs</strong> (press H) at strategic stars to reset efficiency for nearby connections.</p>
+    <p><strong style="color: var(--energy-color);">Energy</strong> accumulates over time from your network. Spend it to build new connections.</p>
+    <p><strong style="color: var(--propulsion-color);">Propulsion tech</strong> extends your maximum connection range, letting you reach more distant stars.</p>
+    <p><strong style="color: var(--discovery-color);">Discoveries</strong> at some stars grant bonus tech: faster energy production or extended range.</p>
+  </div>
+  <button id="start-btn">LAUNCH</button>
+</div>
+
+<script>
+// ========== GAME ENGINE ==========
+const canvas = document.getElementById('game-canvas');
+const ctx = canvas.getContext('2d');
+
+// State
+let gameRunning = false;
+let stars = [];
+let connections = [];
+let selectedStar = null;
+let hoveredStar = null;
+let energy = 150;
+let energyRate = 1.0;
+let maxRange = 80;
+let lineCost = 30;
+const costPerPixel = 0.4;
+let starsConnected = 1;
+let hubCost = 500;
+const hubCostScaling = 200;
+let hubCount = 0;
+let homeworldLevel = 1;
+let camera = { x: 0, y: 0, zoom: 1 };
+let isDragging = false;
+let dragStart = { x: 0, y: 0 };
+let camStart = { x: 0, y: 0 };
+let animTime = 0;
+let particles = [];
+let flowParticles = [];
+
+// Star name catalog (themed by sci-fi universe)
+const STAR_CATALOG = {
+  "Real Stars": ["Sirius", "Canopus", "Arcturus", "Vega", "Capella", "Rigel", "Procyon", "Betelgeuse", "Aldebaran", "Antares", "Spica", "Pollux", "Fomalhaut", "Deneb", "Regulus", "Castor", "Altair", "Achernar", "Bellatrix", "Polaris", "Algol", "Mira", "Rasalhague", "Alphard", "Mizar", "Dubhe", "Merak", "Alioth", "Alcor", "Hamal", "Mirfak", "Alnilam", "Alnitak", "Mintaka", "Saiph", "Elnath", "Menkalinan", "Thuban", "Kochab", "Schedar", "Caph", "Mirach", "Almach", "Enif", "Markab", "Scheat", "Eltanin", "Nunki", "Wezen", "Naos", "Aludra", "Adhara", "Shaula", "Sargas", "Dschubba", "Sabik", "Zubeneschamali"],
+  "Star Wars": ["Coruscant", "Tatooine", "Naboo", "Alderaan", "Kashyyyk", "Mustafar", "Hoth", "Endor", "Dagobah", "Bespin", "Kamino", "Geonosis", "Mandalore", "Dathomir", "Corellia", "Jakku", "Scarif", "Lothal", "Kessel", "Exegol", "Dantooine", "Felucia", "Utapau", "Mygeeto", "Saleucami", "Ossus", "Tython", "Korriban", "Malachor", "Ilum", "Nal Hutta", "Ryloth", "Mon Cala", "Umbara", "Vardos", "Nevarro", "Sorgan", "Arvala-7", "Takodana", "Batuu"],
+  "Star Trek": ["Vulcan", "Qo'noS", "Romulus", "Andoria", "Bajor", "Cardassia", "Betazed", "Risa", "Ferenginar", "Trill", "Tellar", "Remus", "Breen", "Kronos", "Cestus", "Denobula", "Ceti Alpha", "Khitomer", "Archanis", "Benzar", "Bolarus", "Thalos", "Rigel VII", "Bolia", "Trillius Prime", "Gorn", "Tholian", "Coridan", "Draylax", "Sheliak", "Talax", "Ocampa", "Kazon", "Sikaris", "Ledonia", "Penthara", "Jouret", "Minos Korva", "Izar", "Tyrellia"],
+  "Dune": ["Arrakis", "Caladan", "Giedi Prime", "Kaitain", "Salusa Secundus", "Wallach IX", "Ix", "Tleilax", "Lankiveil", "Ecaz", "Grumman", "Richese", "Bela Tegeuse", "Corrin", "Chapterhouse", "Gammu", "Buzzell", "Tupile", "Harmonthep", "Poritrin", "Rossak", "Ginaz", "Gamont", "Hagal", "Zanovar", "Naraj", "Al-Dhanab", "Parmentier", "Zanbar", "Niushe", "Kaitan Sekhar", "Muritan", "Sietch Makab", "Darish", "Jalahiqa", "Shai-Hulud Prime", "Taqwa", "Raqiya", "Safiya", "Khanjar"],
+  "Battlestar Galactica": ["Caprica", "Gemenon", "Tauron", "Picon", "Virgon", "Leonis", "Sagittaron", "Scorpia", "Libran", "Aerilon", "Canceron", "Aquaria", "Kobol", "New Caprica", "Helios Alpha", "Helios Beta", "Helios Gamma", "Helios Delta", "Ragnar", "Cyrannus", "Troy", "Monclair", "Thanatos", "Erebos", "Hestia", "Phocion", "Orestia", "Medra", "Delphi Anchorage", "Prolmar", "Acheron", "Tartaron", "Orpheon", "Thermae", "Parnassos"],
+  "The Expanse": ["Tycho", "Ceres", "Eros", "Ganymede", "Phoebe", "Medina", "Laconia", "Ilus", "Auberon", "Freehold", "Bara Gaon", "New Terra", "Anderson", "Callisto", "Vesta", "Pallas", "Iapetus", "Titania", "Hygeia", "Ring Gate", "Tecoma", "Elvi", "Kronos Station", "San Esteban", "Nieuwestad", "Paradiso", "Gedara", "Cortazar", "Felsenburgh", "Windhoek", "Patagonia", "Nova Brasilia", "Kelso", "Hammon Gate", "Belter's Reach"],
+  "Halo": ["Reach", "Harvest", "Sigma Octanus", "Arcadia", "Onyx", "Meridian", "Requiem", "Sanghelios", "High Charity", "Threshold", "Installation 04", "The Ark", "Eridanus", "Madrigal", "Tribute", "New Mombasa", "Circumstance", "Epsilon Indi", "Chi Ceti", "Zeta Halo", "Draetheus V", "Jericho VII", "New Harmony", "Cascade", "Biko", "Fumirole", "Algolis", "Kholo", "Oban", "Conrad's Point", "Concord", "Ballast", "Criterion", "Bliss", "Estuary"],
+  "Mass Effect": ["Citadel", "Omega", "Thessia", "Palaven", "Tuchanka", "Sur'Kesh", "Rannoch", "Illium", "Noveria", "Ilos", "Virmire", "Eden Prime", "Feros", "Horizon", "Bekenstein", "Arcturus", "Kahje", "Dekuuna", "Irune", "Elcor", "Pragia", "Aite", "Ontarom", "Nepharon", "Chasca", "Therum", "Presrop", "Eingana", "Zorya", "Sanctum", "Anhur", "Garvug", "Watson", "Nodacrux", "Intai'sei"],
+  "Firefly": ["Londinium", "Sihnon", "Persephone", "Ariel", "Osiris", "Beaumonde", "Jiangyin", "Whitefall", "Haven", "Miranda", "Lilac", "Regina", "Athens", "Santo", "Greenleaf", "Ezra", "Triumph", "Higgins Moon", "St. Albans", "Shadow", "Verbena", "Pelorum", "Bellerophon", "Bernadette", "Hera", "Kerry", "Dyton", "Beylix", "Deadwood", "Salisbury", "Harvest", "Aberdeen", "New Melbourne", "Silverhold", "Meadow"],
+  "Warhammer 40K": ["Terra", "Mars", "Cadia", "Macragge", "Fenris", "Baal", "Catachan", "Armageddon", "Necromunda", "Ultramar", "Prospero", "Caliban", "Medusa", "Nocturne", "Tallarn", "Krieg", "Vigilus", "Vostroya", "Tanith", "Istvaan", "Olympia", "Chogoris", "Inwit", "Nostramo", "Colchis", "Barbarus", "Chemos", "Deliverance", "Cthonia", "Ophelia VII", "Mordian", "Valhalla", "Verghast", "Elysia", "Harakoni", "Praetoria", "Scintilla", "Maccabeus Quintus", "Vraks", "Malfi"],
+  "Babylon 5": ["Epsilon Eridani", "Centauri Prime", "Narn", "Minbar", "Z'ha'dum", "Vorlon", "Proxima", "Vega", "Sigma 957", "Epsilon III", "Io", "Drazi", "Markab", "Brakir", "Zagros", "Coriana", "Sector 14", "Third Space", "Tigris", "Deneb", "Orion VII", "Ventari", "Regula", "Abbai", "Hyach", "Gaim", "Pak'ma'ra", "Vree", "Llort", "Sh'lassen", "Torvalus", "Gorash", "Daltron", "Arcas", "Tuzanor"],
+  "Stargate": ["Abydos", "Chulak", "Tollana", "Dakara", "Langara", "Tartarus", "Erebus", "Celestis", "Cimmeria", "Edora", "Kheb", "Othala", "Heliopolis", "Vis Uban", "Asuras", "Athos", "Sateda", "Lantea", "Doranda", "Proclarush", "Velona", "Tagrea", "Pangar", "Hebridan", "Hanka", "Orban", "Vyus", "Latona", "Madrona", "Revanna", "Kallana", "Ver Isca", "Tegalus", "Vagonbrei", "Talthus"],
+  "Foundation": ["Trantor", "Terminus", "Anacreon", "Korell", "Kalgan", "Gaia", "Aurora", "Solaria", "Comporellon", "Sayshell", "Helicon", "Smyrno", "Synnax", "Daribow", "Hesperos", "Santanni", "Askone", "Siwenna", "Melpomenia", "Wencory", "Cinna", "Locris", "Derowd", "Asperta", "Glyptal IV", "Rhodia", "Wanda", "Vincetori", "Mandress", "Florina", "Sark", "Delicass", "Neotrantor", "Iss", "Cil"],
+  "Alien": ["LV-426", "LV-223", "Fiorina 161", "Origae-6", "Sevastopol", "Zeta Reticuli", "Thedus", "BG-386", "Calpamos", "LV-1201", "Fury 161", "Gateway Station", "KG-348", "Tartarus", "Hadley's Hope", "Anchorpoint", "LV-178", "LV-797", "KR-115", "BG-791", "TQ-462", "HK-904", "ND-117", "GX-253", "Pylos Station", "Cerberus Station", "MV-394", "JR-832", "CL-601", "Romulus Station", "XT-209", "Goliath Station", "FN-447", "QR-512", "Erebus Terminal"],
+  "EVE Online": ["Jita", "Amarr", "Dodixie", "Rens", "Hek", "Luminaire", "New Eden", "Niarja", "Perimeter", "Caldari Prime", "Amamake", "Old Man Star", "Tama", "B-R5RB", "HED-GP", "Thera", "Pochven", "Stain", "Providence", "Uedama", "Deklein", "Delve", "Fountain", "Geminate", "Syndicate", "Curse", "Venal", "Tribute", "Cobalt Edge", "Outer Ring", "Solitude", "Aridia", "Khanid", "Lonetrek", "Placid"],
+  "Elite Dangerous": ["Sol", "Achenar", "Alioth", "Shinrarta Dezhra", "Colonia", "Sagittarius A", "Beagle Point", "Hutton Orbital", "Deciat", "Maia", "Merope", "Pleiades", "Witch Head", "Ceos", "Sothis", "Robigo", "Raxxla", "Hip 22460", "Cubeo", "Jameson", "Lave", "Leesti", "Diso", "Riedquat", "Zaonce", "Gateway", "Nanomam", "Kamadhenu", "Carthage", "Eravate", "Agartha", "Wolf 359", "Ross 154", "LHS 3447", "Rhea"],
+  "Cowboy Bebop": ["Tharsis", "Alba City", "Ganymede", "Callisto", "Europa", "Io", "Titan", "Venus", "Tijuana", "Bohemian Junkheap", "Mars", "Blue Crow", "Enceladus", "Phobos", "Deimos", "Nemesis", "Ceres Station", "Oberon", "Rhea", "Hyperion", "Triton", "Charon", "Sedna", "Miranda", "Umbriel", "Ariel Colony", "Vesta Point", "Proteus", "Mimas", "Dione", "Iapetus", "Haumea"],
+  "Macross": ["Eden", "Ragna", "Windermere", "Gallia 4", "Optera", "Garuda", "Haydon IV", "Spheris", "Karbarra", "Praxis", "Peryton", "Fantoma", "Tirol", "Voldor", "Ouroboros", "Lux", "Varauta", "Zola", "Aimo", "Gaul", "Messer", "Protoculture Prime", "Brisingr", "Randor", "Sephira", "Helmhold", "Vanaheim", "Asgard Station", "Mizuho", "Alteria", "Granheim", "Stellvia"],
+  "Hyperion Cantos": ["Hyperion", "God's Grove", "Mare Infinitus", "Renaissance Vector", "Hebron", "Qom-Riyadh", "Maui-Covenant", "Lusus", "Asquith", "Barnard's World", "Parvati", "Tau Ceti Center", "Sol Draconi Septem", "Fuji", "Deneb Drei", "Deneb Vier", "Ixion", "Pacem", "Svayambhu", "Tsingtao-Hsishuang Panna", "Vitus-Gray-Balianus B", "Nevermore", "Endymion", "Patawpha", "New Earth", "Startree Biosphere", "Madhya", "Armaghast", "Archipelago", "Nordholm", "Esperance", "Cibola", "Ursadana", "Thetis", "Elysium Reach"],
+  "Culture Series": ["Schar's World", "Masaq'", "Vavatch", "Pittance", "Chiark", "Azad", "Echronedal", "Sursamen", "Xinth", "Bulthmaas", "Chel", "Gadampth", "Tier", "Dra'Azon", "Idir", "Quietus", "Commentariat", "Ngaroe QG", "Nueh'Bansen", "Kelze", "Lian", "Phlim", "Ronte", "Sichultia", "Fahl", "Cretossie", "Trontsephori", "Yssaril", "Quime", "Goverin", "Dossach", "Lacelere", "Escorai", "Pendicle", "Seddun"],
+  "Revelation Space": ["Yellowstone", "Sky's Edge", "Resurgam", "Turquoise", "Ararat", "Hela", "Haven", "Parcifal", "Grand Teton", "Zion", "Storm", "Diadem", "Marco's Eye", "Grelier", "Haldora", "Spindrift", "Rust Belt", "Chasm City", "Nostalgia for Infinity", "Ferrisville", "Golgotha", "Palantine", "Nightshade", "Obsidian", "Gloom", "Ashfall", "Cairn", "Frosthold", "Tenebris", "Shroud", "Palladion", "Cinder", "Requiem", "Sable", "Abyssal"],
+  "Enderverse": ["Lusitania", "Shakespeare", "Trondheim", "Sorelledolce", "Rov", "Ganges", "Hegira", "Moctezuma", "Eros", "Calicut", "Moskva", "Helvetica", "Pacifica", "Otahiti", "Cornwall", "Mindanao", "Catalonia", "Rheims", "Albion", "Carthago", "Thessalonika", "Nagoya", "Colombo", "Isfahan", "Baikal", "Mekong", "Zanzibar", "Valparaiso", "Kinshasa", "Patna", "Gander", "Tirana", "Plovdiv", "Harare", "Asmara"],
+  "Honorverse": ["Manticore", "Haven", "Grayson", "Sphinx", "Gryphon", "Medusa", "Basilisk", "Erewhon", "Silesia", "Trevor's Star", "Masada", "Endicott", "Torch", "Mesa", "Beowulf", "Sol", "San Martin", "Montana", "Talbott", "Lynx", "Grendelsbane", "Hancock", "Alizon", "Zanzibar", "Casimir", "Barnett", "Seaford", "Cerberus", "Lovat", "Elric", "Yorik", "Stanhope", "Briarwood", "Kreswell", "Whitworth"],
+  "Old Man's War": ["Phoenix Station", "Coral", "Gettysburg", "Huckleberry", "Erie", "Khartoum", "Britannia", "Delhi", "Roanoke", "Arist", "Omagh", "Sedaris", "Whitefall", "Lancaster", "Covell", "Farpoint", "New Goa", "Cumberland", "Redoubt", "Garrison", "Caledonia", "Providence", "Bulwark", "Palisade", "Bastion", "Vanguard", "Citadel Point", "Rampart", "Stronghold", "Outpost Kilo", "Fort Breton", "Resolute", "Frontier", "Meridian", "Sentry"],
+  "Commonwealth (Peter Hamilton)": ["Elan", "Norfolk", "Nyvan", "New California", "Augusta", "Ombey", "Avon", "Tranquillity", "Lalonde", "Valisk", "Kulu", "Oshanko", "Tropicana", "Wessex", "Atherstone", "Peterborough", "Exnall", "Mortonridge", "Govcentral", "High York", "Jesmond", "Anshun", "Silverdale", "Hexham", "Oakham", "Burnley", "St. Helens", "Darlington", "Ripon", "Malton", "Whitby", "Kendal", "Penrith", "Grantham", "Uppingham"],
+  "Red Rising": ["Mars", "Luna", "Io", "Europa", "Ganymede", "Mercury", "Venus", "Triton", "Phobos", "Deimos", "Ceres", "Rhea", "Titan", "Oberon", "Tyche", "Proserpina", "Juno", "Vesta", "Bellona", "Fortuna", "Nemesis", "Carna", "Libertas", "Feronia", "Salacia", "Quirinus", "Palatine", "Curia", "Elysium", "Aventine", "Capitoline", "Esquiline", "Viminal", "Caelian", "Quirinal"],
+  "Wayfarers (Becky Chambers)": ["Hashkath", "Kaandish", "Coriol", "Aeluon", "Cricket", "Hedra Ka", "Port Coriol", "Sohep Frie", "Takbithat", "Reskit", "Shimmerquick", "Gaist", "Pelora", "Harmis", "Te'al", "Ouloo", "Sabeen", "Galtrin", "Vesk", "Laru", "Tupo", "Deeshi", "Krilleth", "Norith", "Yendash", "Brin'tok", "Shalumi", "Mellowgrove", "Kindlewarm", "Hearthspun", "Gentlelight", "Trillsong", "Deepnest", "Wanderwell", "Softhaven"],
+  "Three-Body Problem": ["Trisolaris", "Blue Space", "Gravity", "Bronze Age", "Starship Earth", "DX3906", "Yun Tianming", "Halo City", "Luo Ji", "Cheng Xin", "Star Ring", "Bunker World", "Tianqiong", "Xinghui", "Cangqiong", "Yuzhou", "Hengxing", "Xuankong", "Mingguang", "Shenzhou", "Tianlang", "Longwei", "Fenghuang", "Kunlun", "Penglai", "Yaochi", "Wuji", "Taiyuan", "Zhurong", "Changzheng", "Qiankun", "Lingxiao", "Xinghe", "Tianyu", "Hongmeng"],
+};
+
+// Fallback procedural name generator (for bridge/scattered stars)
+const _namePrefixes = ['Alp','Bet','Gam','Del','Eps','Zet','Eta','The','Iot','Kap','Lam','Sig','Tau','Omi','Rho','Phi','Chi','Psi','Ome','Nex','Vor','Kry','Zel','Ax','Bri','Cor','Dyn','Eld','Fen','Gal','Hex','Ion','Jyn','Kel','Lux','Mir','Nov','Ori','Pul','Qar','Rex','Sol','Tyr','Uma','Vex','Wyr','Xen','Yar','Zar'];
+const _nameSuffixes = ['a','us','is','on','ar','ex','ix','um','en','os','ia','el','an','or','ur','ae','al','in','ir'];
+
+function genStarName() {
+  return randomFrom(_namePrefixes) + randomFrom(_nameSuffixes);
+}
+
+// Array helpers
+function shuffleArray(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function randomFrom(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function getNetBonus(resource) {
+  return resource.energyBonus - (resource.upkeep || 0);
+}
+
+// Resource types
+const RESOURCE_TYPES = [
+  { name: 'Hydrogen', color: '#66bbff', energyBonus: 0.15, symbol: 'H' },
+  { name: 'Helium-3', color: '#aaddff', energyBonus: 0.25, symbol: 'He3' },
+  { name: 'Dark Matter', color: '#b060ff', energyBonus: 0.4, symbol: 'DM' },
+  { name: 'Plasma', color: '#ff8844', energyBonus: 0.2, symbol: 'P' },
+  { name: 'Crystal', color: '#44ffcc', energyBonus: 0.3, symbol: 'Cr' },
+  { name: 'Neutronium', color: '#ff66aa', energyBonus: 0.5, symbol: 'Nt' },
+  { name: 'Void Rock', color: '#886655', energyBonus: 0, upkeep: 0.08, symbol: 'VR' },
+  { name: 'Radiation Storm', color: '#ff4444', energyBonus: 0, upkeep: 0.2, symbol: 'RS' },
+];
+
+// Hospitable-only resources (first 6), used for starter/second ring
+const HOSPITABLE_RESOURCES = RESOURCE_TYPES.filter(r => !r.upkeep);
+const INHOSPITABLE_RESOURCES = RESOURCE_TYPES.filter(r => r.upkeep);
+
+const DISCOVERY_TYPES = [
+  { name: 'Ancient Reactor', desc: 'Energy rate +0.5/s', type: 'energy_rate', value: 0.5 },
+  { name: 'Warp Fragment', desc: 'Range +30', type: 'range', value: 30 },
+  { name: 'Quantum Core', desc: 'Energy rate +1.0/s', type: 'energy_rate', value: 1.0 },
+  { name: 'Hyperdrive Shard', desc: 'Range +50', type: 'range', value: 50 },
+  { name: 'Void Engine', desc: 'Free connection (line cost -15)', type: 'cost_reduce', value: 15 },
+];
+
+// Relay Tech: special discovery that unlocks branching through off-worlds
+// This is NOT in the random pool - it's placed deliberately
+const RELAY_DISCOVERY = { name: 'Relay Network Protocol', desc: 'Unlocks branching through connected worlds', type: 'relay_tech', value: 1 };
+
+let hasRelayTech = false;
+
+// Factory for star objects — single source of truth for star properties
+function makeStar(x, y, resource, discovery, name, theme) {
+  return {
+    x, y,
+    name: name || genStarName(),
+    size: (3 + Math.random() * 3.5) * (1 + resource.energyBonus * 0.3),
+    brightness: 0.7 + Math.random() * 0.3,
+    twinkleSpeed: 1.5 + Math.random() * 3,
+    twinklePhase: Math.random() * Math.PI * 2,
+    spikeAngle: Math.random() * Math.PI,
+    color: resource.color,
+    resource,
+    discovery,
+    connected: false,
+    revealed: false,
+    pulseOffset: Math.random() * Math.PI * 2,
+    theme: theme || null,
+  };
+}
+
+function generateStars() {
+  stars = [];
+  const W = 300000;
+  const H = 200000;
+
+  // Place the homeworld first, near world center
+  const homeX = (Math.random() - 0.5) * 2000;
+  const homeY = (Math.random() - 0.5) * 2000;
+
+  // === STARTER CLUSTER ===
+  // Guarantee 6-9 stars within easy reach of homeworld so the player can get going
+  const realStarNames = shuffleArray(STAR_CATALOG["Real Stars"]);
+  let realStarIdx = 0;
+  function nextRealName() {
+    return realStarIdx < realStarNames.length ? realStarNames[realStarIdx++] : genStarName();
+  }
+
+  const starterCount = 6 + Math.floor(Math.random() * 4);
+  for (let i = 0; i < starterCount; i++) {
+    const angle = (i / starterCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.6;
+    const dist = 40 + Math.random() * 30;
+    const discovery = Math.random() < 0.35 ? randomFrom(DISCOVERY_TYPES) : null;
+    stars.push(makeStar(
+      homeX + Math.cos(angle) * dist,
+      homeY + Math.sin(angle) * dist,
+      randomFrom(HOSPITABLE_RESOURCES), discovery, nextRealName(), 'Real Stars'
+    ));
+  }
+
+  // Place Relay Tech on one inner ring star (index 3-5) so player finds it
+  // after connecting a few stars but before getting stuck
+  {
+    const relayIdx = Math.min(stars.length - 1, 3 + Math.floor(Math.random() * 3));
+    stars[relayIdx].discovery = RELAY_DISCOVERY;
+  }
+
+  // Second ring around homeworld: 8-12 stars at 70-140px (reachable after a range upgrade or two)
+  const ring2Count = 8 + Math.floor(Math.random() * 5);
+  for (let i = 0; i < ring2Count; i++) {
+    const angle = (i / ring2Count) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
+    const dist = 70 + Math.random() * 70;
+    const x = homeX + Math.cos(angle) * dist;
+    const y = homeY + Math.sin(angle) * dist;
+
+    let tooClose = false;
+    for (const s of stars) {
+      if (Math.hypot(s.x - x, s.y - y) < 30) { tooClose = true; break; }
+    }
+    if (tooClose) continue;
+
+    const discovery = Math.random() < 0.22 ? randomFrom(DISCOVERY_TYPES) : null;
+    stars.push(makeStar(x, y, randomFrom(HOSPITABLE_RESOURCES), discovery, nextRealName(), 'Real Stars'));
+  }
+
+  // === GALAXY CLUSTERS - chain-based generation ===
+  // Clusters form a connected web radiating outward from the home zone.
+  // Each new cluster spawns within bridge distance of an existing one.
+  const clusters = [];
+  const clusterCount = 60 + Math.floor(Math.random() * 40);
+
+  // Seed cluster near homeworld
+  clusters.push({
+    x: homeX, y: homeY,
+    radius: 150, density: 0 // starter zone already populated
+  });
+
+  // Grow clusters outward from existing ones
+  for (let i = 0; i < clusterCount; i++) {
+    // Pick a random existing cluster to branch from
+    const parent = randomFrom(clusters);
+    const angle = Math.random() * Math.PI * 2;
+    // Place new cluster 300-800px from parent (close enough that bridge stars can connect them)
+    const branchDist = 300 + Math.random() * 500;
+    const cx = parent.x + Math.cos(angle) * branchDist;
+    const cy = parent.y + Math.sin(angle) * branchDist;
+    const radius = 120 + Math.random() * 280;
+    const density = 8 + Math.floor(Math.random() * 14);
+
+    clusters.push({ x: cx, y: cy, radius, density });
+  }
+
+  // === THEME ASSIGNMENTS ===
+  // Assign each cluster a sci-fi universe theme for naming
+  const universeKeys = Object.keys(STAR_CATALOG).filter(k => k !== "Real Stars");
+  const shuffledUniverses = shuffleArray(universeKeys);
+  // Cluster 0 is the home zone (Real Stars, already handled above)
+  clusters[0].theme = 'Real Stars';
+  clusters[0].namePool = null;
+  clusters[0].nameIdx = 0;
+  for (let ci = 1; ci < clusters.length; ci++) {
+    const uKey = shuffledUniverses[(ci - 1) % shuffledUniverses.length];
+    clusters[ci].theme = uKey;
+    clusters[ci].namePool = shuffleArray(STAR_CATALOG[uKey]);
+    clusters[ci].nameIdx = 0;
+  }
+
+  function pushStar(x, y, discoveryOverride, name, theme, forceResource) {
+    for (const s of stars) {
+      if (Math.hypot(s.x - x, s.y - y) < 35) return false;
+    }
+    const resource = forceResource || randomFrom(HOSPITABLE_RESOURCES);
+    const hasDiscovery = discoveryOverride !== undefined ? !!discoveryOverride : Math.random() < 0.18;
+    const discovery = discoveryOverride || (hasDiscovery ? randomFrom(DISCOVERY_TYPES) : null);
+    stars.push(makeStar(x, y, resource, discovery, name, theme));
+    return true;
+  }
+
+  // Generate stars within clusters (skip the seed cluster at index 0)
+  for (let ci = 1; ci < clusters.length; ci++) {
+    const cluster = clusters[ci];
+    // Skip if too close to starter zone (already populated)
+    if (Math.hypot(cluster.x - homeX, cluster.y - homeY) < 200) continue;
+
+    for (let i = 0; i < cluster.density; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const dist = Math.random() * cluster.radius;
+      const name = cluster.namePool && cluster.nameIdx < cluster.namePool.length
+        ? cluster.namePool[cluster.nameIdx++]
+        : genStarName();
+      const clusterRes = Math.random() < 0.05 ? randomFrom(INHOSPITABLE_RESOURCES) : null;
+      pushStar(cluster.x + Math.cos(angle) * dist, cluster.y + Math.sin(angle) * dist, undefined, name, cluster.theme, clusterRes);
+    }
+  }
+
+  // === BRIDGE STARS between nearby clusters ===
+  // For each pair of clusters that are close-ish, sprinkle 2-4 stars in the gap
+  // so the player can hop between clusters
+  for (let i = 0; i < clusters.length; i++) {
+    for (let j = i + 1; j < clusters.length; j++) {
+      const ci = clusters[i], cj = clusters[j];
+      const d = Math.hypot(ci.x - cj.x, ci.y - cj.y);
+      if (d < 600 && d > 150) {
+        // Place 2-4 bridge stars along the line between clusters
+        const bridgeCount = 2 + Math.floor(Math.random() * 3);
+        for (let b = 0; b < bridgeCount; b++) {
+          const t = 0.2 + (b / bridgeCount) * 0.6 + (Math.random() - 0.5) * 0.1;
+          const bx = ci.x + (cj.x - ci.x) * t + (Math.random() - 0.5) * 60;
+          const by = ci.y + (cj.y - ci.y) * t + (Math.random() - 0.5) * 60;
+          const bridgeRes = Math.random() < 0.4 ? randomFrom(INHOSPITABLE_RESOURCES) : null;
+          pushStar(bx, by, undefined, undefined, undefined, bridgeRes);
+        }
+      }
+    }
+  }
+
+  // Scattered field stars in the deep void (fewer, these are lonely outposts)
+  const scatteredCount = 150 + Math.floor(Math.random() * 100);
+  for (let i = 0; i < scatteredCount; i++) {
+    const x = -W/2 + Math.random() * W;
+    const y = -H/2 + Math.random() * H;
+    const scatRes = Math.random() < 0.3 ? randomFrom(INHOSPITABLE_RESOURCES) : null;
+    pushStar(x, y, undefined, undefined, undefined, scatRes);
+  }
+
+  // === HOMEWORLD ===
+  // Insert homeworld at the center of the starter cluster
+  const homeStar = {
+    x: homeX, y: homeY,
+    name: 'HOMEWORLD',
+    size: 5,
+    brightness: 1,
+    twinkleSpeed: 1,
+    twinklePhase: 0,
+    spikeAngle: 0,
+    color: '#00ff88',
+    resource: { name: 'Genesis Core', color: '#00ff88', energyBonus: 0, symbol: 'GC' },
+    discovery: null,
+    connected: true,
+    revealed: true,
+    isHome: true,
+    pulseOffset: 0,
+    chainDepth: 0,
+  };
+  stars.push(homeStar);
+
+  // Center camera on homeworld
+  camera.x = -homeX;
+  camera.y = -homeY;
+
+  console.log(`Generated ${stars.length} stars across ${W}x${H} world`);
+}
+
+// ========== RENDERING ==========
+function resize() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resize);
+resize();
+
+function worldToScreen(wx, wy) {
+  return {
+    x: (wx + camera.x) * camera.zoom + canvas.width / 2,
+    y: (wy + camera.y) * camera.zoom + canvas.height / 2
+  };
+}
+
+function screenToWorld(sx, sy) {
+  return {
+    x: (sx - canvas.width / 2) / camera.zoom - camera.x,
+    y: (sy - canvas.height / 2) / camera.zoom - camera.y
+  };
+}
+
+function drawBackground() {
+  ctx.fillStyle = '#060612';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Subtle background dust (static, screen-space) - intentionally tiny and dim
+  const seed = 42;
+  for (let i = 0; i < 200; i++) {
+    const hash = (i * 2654435761 + seed) >>> 0;
+    const sx = (hash % canvas.width);
+    const sy = ((hash * 7) % canvas.height);
+    const bright = 0.06 + (hash % 100) / 400;
+    const sz = 0.3 + (hash % 30) / 100;
+    ctx.globalAlpha = bright * (0.6 + 0.4 * Math.sin(animTime * 0.3 + i));
+    ctx.fillStyle = '#667799';
+    ctx.beginPath();
+    ctx.arc(sx, sy, sz, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawConnections() {
+  for (const conn of connections) {
+    const s1 = worldToScreen(conn.from.x, conn.from.y);
+    const s2 = worldToScreen(conn.to.x, conn.to.y);
+
+    // Cull off-screen connections
+    const minX = Math.min(s1.x, s2.x), maxX = Math.max(s1.x, s2.x);
+    const minY = Math.min(s1.y, s2.y), maxY = Math.max(s1.y, s2.y);
+    if (maxX < -20 || minX > canvas.width + 20 || maxY < -20 || minY > canvas.height + 20) continue;
+
+    // Direct homeworld connections are bright green, chains fade toward blue/dim
+    const isDirect = conn.from.isHome || conn.to.isHome;
+    const toDepth = conn.to.chainDepth || 0;
+    const fromDepth = conn.from.chainDepth || 0;
+    const maxDepth = Math.max(toDepth, fromDepth);
+
+    let glowColor, lineColor, lineWidth;
+    if (isDirect) {
+      glowColor = 'rgba(0, 255, 136, 0.15)';
+      lineColor = 'rgba(0, 255, 136, 0.6)';
+      lineWidth = 2;
+    } else {
+      const fade = Math.max(0.15, 1 - maxDepth * 0.12);
+      glowColor = `rgba(80, 140, 220, ${0.1 * fade})`;
+      lineColor = `rgba(80, 140, 220, ${0.45 * fade})`;
+      lineWidth = Math.max(0.8, 1.8 - maxDepth * 0.15);
+    }
+
+    // Glow
+    ctx.strokeStyle = glowColor;
+    ctx.lineWidth = 6 * camera.zoom;
+    ctx.beginPath();
+    ctx.moveTo(s1.x, s1.y);
+    ctx.lineTo(s2.x, s2.y);
+    ctx.stroke();
+
+    // Main line
+    ctx.strokeStyle = lineColor;
+    ctx.lineWidth = lineWidth * camera.zoom;
+    ctx.beginPath();
+    ctx.moveTo(s1.x, s1.y);
+    ctx.lineTo(s2.x, s2.y);
+    ctx.stroke();
+  }
+}
+
+function drawFlowParticles() {
+  for (const p of flowParticles) {
+    // Each particle has a path (array of stars from origin to homeworld)
+    // and a t value representing total progress along the full chain
+    const path = p.path;
+    if (!path || path.length < 2) continue;
+
+    const totalLegs = path.length - 1;
+    const legProgress = p.t * totalLegs;
+    const legIndex = Math.min(Math.floor(legProgress), totalLegs - 1);
+    const legT = legProgress - legIndex;
+
+    const fromStar = path[legIndex];
+    const toStar = path[legIndex + 1];
+    const s1 = worldToScreen(fromStar.x, fromStar.y);
+    const s2 = worldToScreen(toStar.x, toStar.y);
+    const x = s1.x + (s2.x - s1.x) * legT;
+    const y = s1.y + (s2.y - s1.y) * legT;
+
+    ctx.globalAlpha = 0.8;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(x, y, 2 * camera.zoom, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+}
+
+function drawStars() {
+  // With large world, aggressively cull. Spikes can extend ~30px so use wider margin.
+  const margin = 60;
+  for (const star of stars) {
+    const s = worldToScreen(star.x, star.y);
+
+    // Cull off-screen
+    if (s.x < -margin || s.x > canvas.width + margin || s.y < -margin || s.y > canvas.height + margin) continue;
+
+    const pulse = 0.85 + 0.15 * Math.sin(animTime * 2 + star.pulseOffset);
+    let displaySize = star.size * camera.zoom * pulse;
+
+    // Homeworld grows with tech level
+    if (star.isHome) {
+      displaySize *= (1 + (homeworldLevel - 1) * 0.15);
+    }
+
+    const isSelected = star === selectedStar;
+    const isHovered = star === hoveredStar;
+
+    const isInhospitable = !!(star.resource.upkeep);
+
+    if (star.connected) {
+      // Connected star: bright, colored (dim reddish for inhospitable)
+      // Glow
+      const glowSize = displaySize * 5;
+      const grad = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, glowSize);
+      if (isInhospitable) {
+        grad.addColorStop(0, 'rgba(255, 60, 40, 0.2)');
+        grad.addColorStop(0.5, 'rgba(180, 40, 30, 0.06)');
+      } else {
+        grad.addColorStop(0, star.color + '40');
+      }
+      grad.addColorStop(1, 'transparent');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, glowSize, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Core
+      ctx.fillStyle = isInhospitable ? '#994433' : star.color;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, displaySize, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Inner bright
+      ctx.fillStyle = isInhospitable ? '#cc8866' : '#ffffff';
+      ctx.globalAlpha = 0.6;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, displaySize * 0.4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+
+    } else {
+      // Unrevealed star: twinkling, visible, mysterious — with resource-based visual diversity
+      const twinkle = 0.55 + 0.45 * Math.sin(animTime * star.twinkleSpeed + star.twinklePhase);
+      const baseAlpha = star.brightness * twinkle;
+      const starSize = displaySize * 1.1;
+
+      // Parse resource color for tinting
+      const rc = star.color; // hex like '#66bbff'
+      const rcR = parseInt(rc.slice(1,3), 16);
+      const rcG = parseInt(rc.slice(3,5), 16);
+      const rcB = parseInt(rc.slice(5,7), 16);
+
+      // Outer glow halo — blended with subtle resource tint
+      const glowR = starSize * 6;
+      const glowGrad = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, glowR);
+      const gr0 = Math.round(180 * 0.85 + rcR * 0.15);
+      const gg0 = Math.round(210 * 0.85 + rcG * 0.15);
+      const gb0 = Math.round(255 * 0.85 + rcB * 0.15);
+      const gr1 = Math.round(140 * 0.85 + rcR * 0.15);
+      const gg1 = Math.round(180 * 0.85 + rcG * 0.15);
+      const gb1 = Math.round(240 * 0.85 + rcB * 0.15);
+      glowGrad.addColorStop(0, `rgba(${gr0}, ${gg0}, ${gb0}, ${baseAlpha * 0.2})`);
+      glowGrad.addColorStop(0.4, `rgba(${gr1}, ${gg1}, ${gb1}, ${baseAlpha * 0.06})`);
+      glowGrad.addColorStop(1, 'transparent');
+      ctx.fillStyle = glowGrad;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, glowR, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Diffraction spikes — count varies by resource tier
+      const spikeCount = isInhospitable ? 1 : star.resource.energyBonus >= 0.4 ? 4 : star.resource.energyBonus >= 0.25 ? 3 : 2;
+      const spikeLen = starSize * (3 + 2 * twinkle);
+      const spikeWidth = starSize * 0.18;
+      // Tinted spike color: blend resource color at 30% with base #c0d8ff
+      const spR = Math.round(192 * 0.7 + rcR * 0.3);
+      const spG = Math.round(216 * 0.7 + rcG * 0.3);
+      const spB = Math.round(255 * 0.7 + rcB * 0.3);
+      ctx.save();
+      ctx.translate(s.x, s.y);
+      ctx.rotate(star.spikeAngle);
+      ctx.globalAlpha = baseAlpha * 0.6;
+      ctx.fillStyle = `rgb(${spR}, ${spG}, ${spB})`;
+      for (let sp = 0; sp < spikeCount; sp++) {
+        ctx.save();
+        ctx.rotate((sp / spikeCount) * Math.PI);
+        ctx.beginPath();
+        ctx.moveTo(-spikeLen, 0);
+        ctx.lineTo(0, -spikeWidth);
+        ctx.lineTo(spikeLen, 0);
+        ctx.lineTo(0, spikeWidth);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+      ctx.restore();
+      ctx.globalAlpha = 1;
+
+      // Core body — mostly white/blue with hint of resource color
+      const coreGrad = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, starSize);
+      coreGrad.addColorStop(0, `rgba(255, 255, 255, ${baseAlpha})`);
+      const cmR = Math.round(190 * 0.85 + rcR * 0.15);
+      const cmG = Math.round(215 * 0.85 + rcG * 0.15);
+      const cmB = Math.round(255 * 0.85 + rcB * 0.15);
+      coreGrad.addColorStop(0.5, `rgba(${cmR}, ${cmG}, ${cmB}, ${baseAlpha * 0.7})`);
+      coreGrad.addColorStop(1, `rgba(120, 160, 230, 0)`);
+      ctx.fillStyle = coreGrad;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, starSize, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Hot center dot
+      ctx.globalAlpha = baseAlpha;
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, starSize * 0.35, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+
+      // Inhospitable warning halo — pulsing dark red ring
+      if (isInhospitable) {
+        const warn = Math.sin(animTime * 2.5 + star.pulseOffset * 5) * 0.5 + 0.5;
+        ctx.strokeStyle = star.resource.upkeep >= 0.2 ? 'rgba(255, 40, 40, 0.18)' : 'rgba(200, 80, 50, 0.14)';
+        ctx.lineWidth = 1.2;
+        ctx.globalAlpha = baseAlpha * (0.3 + warn * 0.5);
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, starSize * 2.5 + warn * 3, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+
+      // Discovery shimmer — faint pulsing ring for stars with discoveries
+      if (star.discovery) {
+        const shimmer = Math.sin(animTime * 3 + star.pulseOffset * 7) * 0.5 + 0.5;
+        if (shimmer > 0.6) {
+          ctx.strokeStyle = star.discovery.type === 'relay_tech' ? 'rgba(255, 68, 255, 0.15)' : 'rgba(255, 228, 77, 0.12)';
+          ctx.lineWidth = 0.8;
+          ctx.globalAlpha = (shimmer - 0.6) * 2;
+          ctx.beginPath();
+          ctx.arc(s.x, s.y, starSize * 3 + shimmer * 4, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.globalAlpha = 1;
+        }
+      }
+    }
+
+    // Selection ring
+    if (isSelected) {
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.5;
+      ctx.globalAlpha = 0.6 + 0.4 * Math.sin(animTime * 4);
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, displaySize + 8, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+
+      // Draw range circle
+      ctx.strokeStyle = 'rgba(255, 107, 53, 0.2)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 6]);
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, maxRange * camera.zoom, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // Hover ring
+    if (isHovered && !isSelected) {
+      ctx.strokeStyle = 'rgba(200, 220, 255, 0.3)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, displaySize + 6, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // Home marker - evolves with tech level
+    if (star.isHome) {
+      const level = homeworldLevel || 1;
+      const baseR = displaySize + 10;
+
+      // Level 1+: Inner rotating hex
+      ctx.save();
+      ctx.translate(s.x, s.y);
+      ctx.rotate(animTime * 0.3);
+      ctx.strokeStyle = '#00ff88';
+      ctx.lineWidth = 1.2;
+      ctx.globalAlpha = 0.5 + 0.15 * Math.sin(animTime * 1.5);
+      ctx.beginPath();
+      for (let i = 0; i <= 6; i++) {
+        const a = (i / 6) * Math.PI * 2;
+        const r = baseR;
+        if (i === 0) ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+        else ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+      }
+      ctx.closePath();
+      ctx.stroke();
+      ctx.restore();
+      ctx.globalAlpha = 1;
+
+      // Level 2+: Outer pulsing ring
+      if (level >= 2) {
+        const ringR = baseR + 6 + 2 * Math.sin(animTime * 2);
+        ctx.strokeStyle = 'rgba(0, 255, 136, 0.3)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, ringR, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      // Level 3+: Orbiting defense/relay dots
+      if (level >= 3) {
+        const orbitR = baseR + 14;
+        const dotCount = Math.min(level - 1, 6);
+        for (let i = 0; i < dotCount; i++) {
+          const a = animTime * 0.8 + (i / dotCount) * Math.PI * 2;
+          const dx = s.x + Math.cos(a) * orbitR;
+          const dy = s.y + Math.sin(a) * orbitR;
+          ctx.fillStyle = '#00ff88';
+          ctx.globalAlpha = 0.6;
+          ctx.beginPath();
+          ctx.arc(dx, dy, 1.5 * camera.zoom, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+      }
+
+      // Level 4+: Radiating energy field
+      if (level >= 4) {
+        const fieldR = baseR + 22 + 4 * Math.sin(animTime);
+        const grad = ctx.createRadialGradient(s.x, s.y, baseR, s.x, s.y, fieldR);
+        grad.addColorStop(0, 'rgba(0, 255, 136, 0.08)');
+        grad.addColorStop(1, 'transparent');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, fieldR, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Level 5+: Counter-rotating outer ring
+      if (level >= 5) {
+        ctx.save();
+        ctx.translate(s.x, s.y);
+        ctx.rotate(-animTime * 0.5);
+        ctx.strokeStyle = 'rgba(0, 229, 255, 0.25)';
+        ctx.lineWidth = 0.8;
+        ctx.setLineDash([3, 8]);
+        ctx.beginPath();
+        ctx.arc(0, 0, baseR + 28, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.restore();
+      }
+
+      // Level 6+: Power arcs
+      if (level >= 6) {
+        const arcR = baseR + 18;
+        ctx.strokeStyle = 'rgba(0, 229, 255, 0.3)';
+        ctx.lineWidth = 1.5;
+        for (let i = 0; i < 3; i++) {
+          const aStart = animTime * 1.2 + (i / 3) * Math.PI * 2;
+          ctx.beginPath();
+          ctx.arc(s.x, s.y, arcR, aStart, aStart + 0.6);
+          ctx.stroke();
+        }
+      }
+
+      // Level label
+      if (camera.zoom > 0.4) {
+        ctx.font = `${Math.max(8, 9 * camera.zoom)}px Orbitron`;
+        ctx.fillStyle = 'rgba(0, 255, 136, 0.5)';
+        ctx.textAlign = 'center';
+        ctx.fillText(`LEVEL ${level}`, s.x, s.y + displaySize + 26);
+      }
+    }
+
+    // Hub marker — rotating cyan diamond
+    if (star.isHub) {
+      const hubR = displaySize + 7;
+      ctx.save();
+      ctx.translate(s.x, s.y);
+      ctx.rotate(Math.PI / 4 + animTime * 0.2);
+      ctx.strokeStyle = '#00e5ff';
+      ctx.lineWidth = 1.2;
+      ctx.globalAlpha = 0.6 + 0.2 * Math.sin(animTime * 2);
+      ctx.strokeRect(-hubR, -hubR, hubR * 2, hubR * 2);
+      ctx.restore();
+      ctx.globalAlpha = 1;
+
+      if (camera.zoom > 0.4) {
+        ctx.font = `${Math.max(7, 8 * camera.zoom)}px Orbitron`;
+        ctx.fillStyle = 'rgba(0, 229, 255, 0.6)';
+        ctx.textAlign = 'center';
+        ctx.fillText('HUB', s.x, s.y - displaySize - 8);
+      }
+    }
+
+    // Label for connected stars
+    if (star.connected && camera.zoom > 0.6) {
+      ctx.font = `${Math.max(9, 10 * camera.zoom)}px Orbitron`;
+      ctx.fillStyle = 'rgba(200, 216, 240, 0.6)';
+      ctx.textAlign = 'center';
+      ctx.fillText(star.name, s.x, s.y + displaySize + 14);
+    }
+  }
+}
+
+function drawPreviewLine() {
+  if (!hoveredStar || hoveredStar.connected) return;
+
+  const best = findBestConnection(hoveredStar);
+  if (!best) {
+    // No valid connection - show blocked indicator
+    const nearest = nearestConnectedStar(hoveredStar);
+    if (nearest.star && nearest.dist <= maxRange) {
+      const s1 = worldToScreen(nearest.star.x, nearest.star.y);
+      const s2 = worldToScreen(hoveredStar.x, hoveredStar.y);
+      ctx.strokeStyle = 'rgba(255, 51, 85, 0.2)';
+      ctx.lineWidth = 1.5 * camera.zoom;
+      ctx.setLineDash([3, 6]);
+      ctx.beginPath();
+      ctx.moveTo(s1.x, s1.y);
+      ctx.lineTo(s2.x, s2.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // X mark at midpoint
+      const mx = (s1.x + s2.x) / 2, my = (s1.y + s2.y) / 2;
+      ctx.strokeStyle = 'rgba(255, 51, 85, 0.5)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(mx - 6, my - 6); ctx.lineTo(mx + 6, my + 6);
+      ctx.moveTo(mx + 6, my - 6); ctx.lineTo(mx - 6, my + 6);
+      ctx.stroke();
+    }
+    return;
+  }
+
+  const s1 = worldToScreen(best.star.x, best.star.y);
+  const s2 = worldToScreen(hoveredStar.x, hoveredStar.y);
+  const cost = getConnectionCost(best.star, hoveredStar);
+  const canAfford = energy >= cost;
+  const isDirect = best.star.isHome;
+
+  // Choose colors based on connection type and affordability
+  let lineColor, glowColor, labelBg;
+  if (!canAfford) {
+    lineColor = 'rgba(255, 51, 85, 0.5)';
+    glowColor = 'rgba(255, 51, 85, 0.15)';
+    labelBg = 'rgba(255, 51, 85, 0.15)';
+  } else if (isDirect) {
+    lineColor = 'rgba(0, 255, 136, 0.6)';
+    glowColor = 'rgba(0, 255, 136, 0.15)';
+    labelBg = 'rgba(0, 255, 136, 0.12)';
+  } else {
+    lineColor = 'rgba(100, 160, 255, 0.55)';
+    glowColor = 'rgba(100, 160, 255, 0.12)';
+    labelBg = 'rgba(100, 160, 255, 0.12)';
+  }
+
+  // Glow behind the preview line
+  ctx.strokeStyle = glowColor;
+  ctx.lineWidth = 8 * camera.zoom;
+  ctx.beginPath();
+  ctx.moveTo(s1.x, s1.y);
+  ctx.lineTo(s2.x, s2.y);
+  ctx.stroke();
+
+  // Main preview line - animated dash
+  ctx.strokeStyle = lineColor;
+  ctx.lineWidth = 2 * camera.zoom;
+  ctx.setLineDash([8, 5]);
+  ctx.lineDashOffset = -animTime * 30;
+  ctx.beginPath();
+  ctx.moveTo(s1.x, s1.y);
+  ctx.lineTo(s2.x, s2.y);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.lineDashOffset = 0;
+
+  // Animated pulse dot traveling the proposed line
+  const pulseT = (animTime * 0.8) % 1;
+  const px = s1.x + (s2.x - s1.x) * pulseT;
+  const py = s1.y + (s2.y - s1.y) * pulseT;
+  ctx.fillStyle = lineColor;
+  ctx.globalAlpha = 0.9;
+  ctx.beginPath();
+  ctx.arc(px, py, 3 * camera.zoom, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+
+  // Highlight the source star with a ring
+  ctx.strokeStyle = lineColor;
+  ctx.lineWidth = 2;
+  ctx.globalAlpha = 0.5 + 0.3 * Math.sin(animTime * 5);
+  ctx.beginPath();
+  ctx.arc(s1.x, s1.y, 12 * camera.zoom, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+
+  // Label at midpoint of the proposed line
+  const mx = (s1.x + s2.x) / 2;
+  const my = (s1.y + s2.y) / 2;
+  const hops = best.depth + 1;
+  const eff = Math.round(getEfficiency(hops) * 100);
+  let label;
+  if (!canAfford) {
+    label = `Need ${cost}E`;
+  } else if (isDirect) {
+    label = `Direct to Home · ${cost}E`;
+  } else {
+    label = `Via ${best.star.name} · ${hops} hops · ${eff}% · ${cost}E`;
+  }
+
+  ctx.font = `${Math.max(10, 11 * camera.zoom)}px Rajdhani`;
+  const metrics = ctx.measureText(label);
+  const lw = metrics.width + 14;
+  const lh = 20;
+
+  // Label background
+  ctx.fillStyle = labelBg;
+  ctx.strokeStyle = lineColor;
+  ctx.lineWidth = 1;
+  // Rounded rect (manual for compat)
+  const rx = mx - lw/2, ry = my - lh - 6, rr = 4;
+  ctx.beginPath();
+  ctx.moveTo(rx + rr, ry);
+  ctx.lineTo(rx + lw - rr, ry);
+  ctx.arcTo(rx + lw, ry, rx + lw, ry + rr, rr);
+  ctx.lineTo(rx + lw, ry + lh - rr);
+  ctx.arcTo(rx + lw, ry + lh, rx + lw - rr, ry + lh, rr);
+  ctx.lineTo(rx + rr, ry + lh);
+  ctx.arcTo(rx, ry + lh, rx, ry + lh - rr, rr);
+  ctx.lineTo(rx, ry + rr);
+  ctx.arcTo(rx, ry, rx + rr, ry, rr);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // Label text
+  ctx.fillStyle = canAfford ? '#ffffff' : 'rgba(255, 150, 150, 0.9)';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, mx, my - lh/2 - 6);
+  ctx.textBaseline = 'alphabetic';
+}
+
+// ========== PARTICLES ==========
+function spawnConnectionParticles(from, to) {
+  const count = 12;
+  for (let i = 0; i < count; i++) {
+    const t = Math.random();
+    const x = from.x + (to.x - from.x) * t;
+    const y = from.y + (to.y - from.y) * t;
+    particles.push({
+      x, y,
+      vx: (Math.random() - 0.5) * 40,
+      vy: (Math.random() - 0.5) * 40,
+      life: 1,
+      decay: 0.5 + Math.random() * 0.5,
+      color: to.resource.color,
+      size: 1 + Math.random() * 2
+    });
+  }
+}
+
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.life -= p.decay * dt;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+}
+
+function drawParticles() {
+  for (const p of particles) {
+    const s = worldToScreen(p.x, p.y);
+    ctx.globalAlpha = p.life * 0.8;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, p.size * camera.zoom, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function getPathToHomeworld(star) {
+  if (star.isHome) return [star];
+  const visited = new Set([star]);
+  const queue = [{ node: star, path: [star] }];
+  while (queue.length > 0) {
+    const { node, path } = queue.shift();
+    for (const neighbor of getNeighbors(node)) {
+      if (visited.has(neighbor)) continue;
+      const newPath = [...path, neighbor];
+      if (neighbor.isHome) return newPath;
+      visited.add(neighbor);
+      queue.push({ node: neighbor, path: newPath });
+    }
+  }
+  return null;
+}
+
+function updateFlowParticles(dt) {
+  // Spawn new flow particles from connected stars
+  for (const star of stars) {
+    if (!star.connected || star.isHome) continue;
+    // Spawn rate proportional to resource output
+    if (Math.random() < dt * (0.5 + star.resource.energyBonus)) {
+      const path = getPathToHomeworld(star);
+      if (path && path.length >= 2) {
+        const chainLen = path.length - 1;
+        flowParticles.push({
+          path,
+          t: 0,
+          // Slower speed for longer chains - each hop adds travel time
+          speed: 0.3 / chainLen,
+          color: star.resource.color,
+        });
+      }
+    }
+  }
+
+  for (let i = flowParticles.length - 1; i >= 0; i--) {
+    const p = flowParticles[i];
+    p.t += p.speed * dt;
+    if (p.t >= 1) flowParticles.splice(i, 1);
+  }
+
+  // Limit count
+  if (flowParticles.length > 300) flowParticles.splice(0, flowParticles.length - 300);
+}
+
+// ========== GAME LOGIC ==========
+
+// Efficiency curve with asymptotic floor — remote stars lose throughput
+// but never become worthless. Floor at 40%, smooth decay via 0.88^depth.
+function getEfficiency(depth) {
+  if (depth <= 0) return 1;
+  return 0.4 + 0.6 * Math.pow(0.88, depth);
+}
+
+// Connection cost scales with distance — bridges are an investment
+function getConnectionCost(from, to) {
+  const dist = Math.hypot(from.x - to.x, from.y - to.y);
+  return Math.round(lineCost + dist * costPerPixel);
+}
+
+// Line segment intersection test (do segments A1-A2 and B1-B2 cross?)
+function segmentsIntersect(a1x, a1y, a2x, a2y, b1x, b1y, b2x, b2y) {
+  const d1x = a2x - a1x, d1y = a2y - a1y;
+  const d2x = b2x - b1x, d2y = b2y - b1y;
+  const cross = d1x * d2y - d1y * d2x;
+  if (Math.abs(cross) < 1e-10) return false; // parallel
+
+  const dx = b1x - a1x, dy = b1y - a1y;
+  const t = (dx * d2y - dy * d2x) / cross;
+  const u = (dx * d1y - dy * d1x) / cross;
+
+  // Exclude endpoint touches (t/u exactly 0 or 1) to allow shared vertices
+  const eps = 0.001;
+  return t > eps && t < (1 - eps) && u > eps && u < (1 - eps);
+}
+
+// Check if a proposed connection would cross any existing connection
+function wouldCrossExisting(fromStar, toStar) {
+  for (const conn of connections) {
+    if (conn.from === fromStar || conn.from === toStar ||
+        conn.to === fromStar || conn.to === toStar) continue; // shared endpoint is OK
+    if (segmentsIntersect(
+      fromStar.x, fromStar.y, toStar.x, toStar.y,
+      conn.from.x, conn.from.y, conn.to.x, conn.to.y
+    )) return true;
+  }
+  return false;
+}
+
+// Get connected neighbors of a star
+function getNeighbors(star) {
+  const neighbors = [];
+  for (const conn of connections) {
+    if (conn.from === star) neighbors.push(conn.to);
+    else if (conn.to === star) neighbors.push(conn.from);
+  }
+  return neighbors;
+}
+
+// BFS depth search — returns hop count to nearest star matching `isTarget`
+function bfsDepth(star, isTarget) {
+  if (star.isHome) return 0;
+  const visited = new Set([star]);
+  const queue = [{ node: star, depth: 0 }];
+  while (queue.length > 0) {
+    const { node, depth } = queue.shift();
+    for (const neighbor of getNeighbors(node)) {
+      if (visited.has(neighbor)) continue;
+      if (isTarget(neighbor)) return depth + 1;
+      visited.add(neighbor);
+      queue.push({ node: neighbor, depth: depth + 1 });
+    }
+  }
+  return Infinity;
+}
+
+// Hop count to nearest hub or homeworld
+function computeChainDepth(star) {
+  return bfsDepth(star, n => n.isHome || n.isHub);
+}
+
+// Hop count to homeworld only (ignoring hubs) — used for hub's own depth
+function computeRawDepthToHome(star) {
+  return bfsDepth(star, n => n.isHome);
+}
+
+// Find the nearest hub or homeworld reachable through connections
+function findNearestAnchor(star) {
+  if (star.isHome) return star;
+  const visited = new Set([star]);
+  const queue = [star];
+  while (queue.length > 0) {
+    const current = queue.shift();
+    for (const neighbor of getNeighbors(current)) {
+      if (visited.has(neighbor)) continue;
+      if (neighbor.isHome || neighbor.isHub) return neighbor;
+      visited.add(neighbor);
+      queue.push(neighbor);
+    }
+  }
+  return stars.find(s => s.isHome);
+}
+
+// Recompute all chain depths and effective energy rates
+function recomputeNetwork() {
+  let totalRate = 1.0; // Base rate from homeworld
+
+  // Pass 1: compute hub depths (raw hops to homeworld, ignoring other hubs)
+  for (const star of stars) {
+    if (!star.connected || star.isHome) continue;
+    if (star.isHub) {
+      star.chainDepth = computeRawDepthToHome(star);
+      star.efficiency = getEfficiency(star.chainDepth);
+      star.effectiveBonus = getNetBonus(star.resource) * star.efficiency;
+      totalRate += star.effectiveBonus;
+    }
+  }
+
+  // Pass 2: compute non-hub star depths (can terminate at hub or home)
+  for (const star of stars) {
+    if (!star.connected || star.isHome || star.isHub) continue;
+    const localDepth = computeChainDepth(star);
+    star.chainDepth = localDepth;
+    const anchor = findNearestAnchor(star);
+    const anchorEff = anchor.isHome ? 1.0 : (anchor.efficiency || getEfficiency(computeRawDepthToHome(anchor)));
+    star.efficiency = anchorEff * getEfficiency(localDepth);
+    star.effectiveBonus = getNetBonus(star.resource) * star.efficiency;
+    totalRate += star.effectiveBonus;
+  }
+
+  // Safety floor: prevent total economic death
+  energyRate = Math.max(0.1, totalRate);
+
+  // Homeworld tech level based on cumulative progress
+  homeworldLevel = Math.floor(1 + Math.log2(1 + starsConnected) + Math.log2(1 + maxRange / 80));
+}
+
+// Upgrade a connected star to a relay hub
+function upgradeToHub(star) {
+  if (!star || !star.connected || star.isHome || star.isHub) return false;
+  const cost = hubCost + hubCount * hubCostScaling;
+  if (energy < cost) {
+    addLog(`Not enough energy for hub (${Math.floor(energy)}/${cost})`, 'tech');
+    return false;
+  }
+  energy -= cost;
+  star.isHub = true;
+  hubCount++;
+  showNotification('Relay Hub Online!', `${star.name} now resets chain depth`, '#00e5ff');
+  addLog(`HUB: ${star.name} upgraded (cost ${cost}E)`, 'resource');
+  recomputeNetwork();
+  updateHUD();
+  return true;
+}
+
+// Find the best "from" star to connect to a target, preferring homeworld
+// Without Relay Tech, ONLY homeworld can be a source (no branching)
+function findBestConnection(target) {
+  let candidates = [];
+
+  for (const s of stars) {
+    if (!s.connected) continue;
+
+    // Before relay tech: only homeworld can source connections
+    if (!hasRelayTech && !s.isHome) continue;
+
+    const dist = Math.hypot(s.x - target.x, s.y - target.y);
+    if (dist > maxRange) continue;
+    if (wouldCrossExisting(s, target)) continue;
+
+    const depth = s.isHome ? 0 : (s.chainDepth || computeChainDepth(s));
+    candidates.push({ star: s, dist, depth });
+  }
+
+  if (candidates.length === 0) return null;
+
+  // Sort: prefer homeworld (depth 0) first, then shallowest depth, then shortest distance
+  candidates.sort((a, b) => {
+    if (a.depth !== b.depth) return a.depth - b.depth;
+    return a.dist - b.dist;
+  });
+
+  return candidates[0];
+}
+
+function connectStar(from, to) {
+  if (!from.connected || to.connected) return false;
+
+  const dist = Math.hypot(from.x - to.x, from.y - to.y);
+  if (dist > maxRange) return false;
+  const cost = getConnectionCost(from, to);
+  if (energy < cost) return false;
+  if (wouldCrossExisting(from, to)) return false;
+
+  energy -= cost;
+  to.connected = true;
+  to.revealed = true;
+  to.parentStar = from; // Track the direct parent for flow routing
+  starsConnected++;
+
+  // Range milestone every 10 stars
+  if (starsConnected % 10 === 0) {
+    maxRange += 20;
+    showNotification('Network Expansion!', `Range +20 (now ${Math.round(maxRange)}px)`, 'var(--propulsion-color)');
+    addLog(`MILESTONE: ${starsConnected} stars — range expanded to ${Math.round(maxRange)}px`, 'tech');
+  }
+
+  connections.push({ from, to });
+  spawnConnectionParticles(from, to);
+
+  // Recompute entire network efficiency
+  recomputeNetwork();
+
+  const depth = computeChainDepth(to);
+  const eff = getEfficiency(depth);
+  const upkeep = to.resource.upkeep || 0;
+  const effectiveBonus = getNetBonus(to.resource) * eff;
+
+  if (from.isHome) {
+    addLog(`Direct link to ${to.name}`, 'resource');
+  } else {
+    addLog(`Connected ${to.name} via ${from.name} (${depth} hops)`, 'resource');
+  }
+  if (upkeep > 0) {
+    addLog(`OUTPOST: ${to.resource.name} — upkeep ${(upkeep * eff).toFixed(2)}/s (${Math.round(eff*100)}% eff)`, 'tech');
+  } else {
+    addLog(`+${effectiveBonus.toFixed(2)}/s ${to.resource.name} (${Math.round(eff*100)}% efficiency)`, 'resource');
+  }
+
+  // Check for discovery
+  if (to.discovery) {
+    const d = to.discovery;
+    if (d.type === 'energy_rate') {
+      energyRate += d.value;
+      showNotification(`${d.name}!`, d.desc, 'var(--discovery-color)');
+    } else if (d.type === 'range') {
+      maxRange += d.value;
+      showNotification(`${d.name}!`, d.desc, 'var(--propulsion-color)');
+    } else if (d.type === 'cost_reduce') {
+      lineCost = Math.max(10, lineCost - d.value);
+      showNotification(`${d.name}!`, d.desc, 'var(--energy-color)');
+    } else if (d.type === 'relay_tech') {
+      hasRelayTech = true;
+      showNotification(`${d.name}!`, 'You can now branch through connected worlds', '#ff44ff');
+    }
+    addLog(`DISCOVERY: ${d.name} - ${d.desc}`, 'tech');
+    recomputeNetwork();
+  }
+
+  updateHUD();
+  return true;
+}
+
+function updateEnergy(dt) {
+  energy += energyRate * dt;
+}
+
+// ========== UI ==========
+function updateHUD() {
+  document.getElementById('hud-energy').textContent = Math.floor(energy);
+  document.getElementById('hud-range').textContent = Math.round(maxRange);
+  document.getElementById('hud-stars').textContent = starsConnected;
+  document.getElementById('hud-level').textContent = homeworldLevel;
+  document.getElementById('energy-rate').textContent = energyRate.toFixed(1) + '/s';
+  document.getElementById('range-val').textContent = Math.round(maxRange) + ' px';
+  document.getElementById('line-cost-val').textContent = lineCost + '+ E';
+  document.getElementById('energy-bar').style.width = Math.min(100, energyRate / 5 * 100) + '%';
+  document.getElementById('range-bar').style.width = Math.min(100, maxRange / 300 * 100) + '%';
+  const relayEl = document.getElementById('relay-status');
+  if (hasRelayTech) {
+    relayEl.textContent = hubCount > 0 ? `${hubCount} Hub${hubCount > 1 ? 's' : ''}` : 'Active';
+    relayEl.style.color = hubCount > 0 ? '#00e5ff' : '#ff44ff';
+  } else {
+    relayEl.textContent = 'Locked';
+    relayEl.style.color = 'var(--text-dim)';
+  }
+}
+
+// ========== OBSERVATION TEXT ENGINE ==========
+// Each star gets an observation assigned at generation time based on its properties.
+// Three tiers: MUNDANE (70%), INTRIGUING (22%), MYSTERIOUS (8%)
+// Within each tier, resource type subtly flavors the text.
+
+const OBS_MUNDANE = [
+  // Generic dull readings - the "nothing here" vibe
+  'Standard main-sequence output. Nothing remarkable.',
+  'Stable luminosity. Unremarkable spectral profile.',
+  'Consistent readings across all bands. Quiet system.',
+  'Low-variance light curve. Probably a dead system.',
+  'Thermal output within expected parameters.',
+  'No anomalies detected. A steady, boring star.',
+  'Background radiation levels are nominal here.',
+  'Photometric data shows a common G-type signature.',
+  'Standard hydrogen burn. Billions of years left on the clock.',
+  'Mild stellar wind. No planetary bodies resolved.',
+  'Clean spectrum. Textbook main-sequence dwarf.',
+  'Unremarkable. Our sensors barely registered it.',
+  'A dim point among millions. Hard to justify the trip.',
+  'Spectrograph shows nothing we haven\'t seen before.',
+  'Stable output, no flares, no planets of note.',
+  'Another quiet sun. The galaxy is full of them.',
+  'Readings are flat. This one won\'t make any papers.',
+  'Consistent redshift. Moving away, slowly.',
+  'Light curve is pancake-flat. Dormant system.',
+  'Standard emissions. Catalog it and move on.',
+  'Just another furnace in the void.',
+  'Sensors confirm: it\'s a star. That\'s about it.',
+  'Faint lithium lines. Old. Tired. Unremarkable.',
+  'We could study it for a century and learn nothing new.',
+  'The most interesting thing here is how uninteresting it is.',
+];
+
+const OBS_INTRIGUING = {
+  'Hydrogen': [
+    'Hydrogen emissions are unusually concentrated. Dense fuel reserves possible.',
+    'Blue-shifted spectral lines suggest a high-pressure hydrogen envelope.',
+    'The hydrogen signature here is three times the local average.',
+    'Absorption bands suggest a thick atmosphere. Fuel-rich system.',
+    'Our models can\'t account for the hydrogen density readings.',
+    'Spectral purity is remarkable. Almost no metallic contamination.',
+    'Hydrogen-alpha emissions pulse in a slow, regular rhythm.',
+    'The fuel signature alone makes this worth investigating.',
+  ],
+  'Helium-3': [
+    'Isotope ratios are unusual. Elevated helium-3 concentrations.',
+    'Something is enriching the local medium with light isotopes.',
+    'Helium-3 levels here exceed known natural processes.',
+    'The solar wind carries an unusual isotopic payload.',
+    'Fusion-grade helium signatures at unexpected concentrations.',
+    'This system may sit atop a primordial isotope reserve.',
+    'Young star, old isotopes. The chemistry doesn\'t quite add up.',
+    'Our spectrometer is getting clean helium-3 lines from here.',
+  ],
+  'Dark Matter': [
+    'Light bends strangely near this system. Gravitational anomaly.',
+    'Our mass estimates don\'t match the visible matter.',
+    'Something here has gravity but no luminosity.',
+    'Photons from behind this star arrive on a curve.',
+    'The gravitational field extends further than it should.',
+    'We see the effect of mass that isn\'t there.',
+    'Lensing artifacts in the background stars. Something heavy.',
+    'The void around this system is... dense, somehow.',
+  ],
+  'Plasma': [
+    'Coronal temperature readings are far above expected values.',
+    'Energetic plasma discharges visible even at this range.',
+    'The system radiates across the full electromagnetic spectrum.',
+    'Thermal output suggests an active, volatile environment.',
+    'Solar flare activity is constant. The star never settles.',
+    'X-ray emissions spike every few hours. Intense system.',
+    'The corona extends well beyond the habitable zone.',
+    'Energy output per unit mass is abnormally high here.',
+  ],
+  'Crystal': [
+    'Reflected light shows a prismatic interference pattern.',
+    'Periodic brightness spikes suggest large reflective surfaces.',
+    'Albedo readings are unusually high for a system this dim.',
+    'Something in orbit is catching the light at regular intervals.',
+    'Spectral reflectance peaks at wavelengths consistent with lattice structures.',
+    'The light curve has a faceted quality. Like cut glass.',
+    'Whatever orbits here, it shines like a mirror.',
+    'Mineral signatures dominate the reflected spectrum.',
+  ],
+  'Neutronium': [
+    'Gravity readings suggest extreme matter density.',
+    'The mass-to-luminosity ratio here is off the scale.',
+    'Tidal forces measurable even at this distance.',
+    'Something incredibly dense sits at the center of this system.',
+    'Our instruments struggle with the gravitational gradient.',
+    'Degenerate matter signatures. This system collapsed, then reformed.',
+    'The local spacetime geometry is measurably warped.',
+    'Whatever is here, it weighs far more than it should.',
+  ],
+  'Void Rock': [
+    'Barren. Dead rock, no atmosphere, no resources worth extracting.',
+    'Sensors show nothing but slag and dust. An outpost would cost us.',
+    'Lifeless debris field. Maintaining presence here would drain reserves.',
+    'The system is stripped bare. Whatever was here is long gone.',
+    'Spectral flatline. No usable materials detected anywhere.',
+    'A husk of a system. We\'d burn energy just keeping the lights on.',
+    'Rocky remnants orbit a dying ember. Not worth settling unless we must.',
+    'No viable resources. Any outpost here survives on imported energy.',
+  ],
+  'Radiation Storm': [
+    'Radiation levels are lethal across the entire system. Shielding required.',
+    'Electromagnetic storms cycle every few minutes. Equipment won\'t last.',
+    'The radiation flux here would cook unshielded electronics in hours.',
+    'Constant particle bombardment. Maintaining anything here costs dearly.',
+    'Solar wind velocity is off the charts. Corrosive, relentless.',
+    'Gamma-ray bursts sweep the system at irregular intervals. Hostile.',
+    'The star vomits charged particles in continuous eruptions.',
+    'Our probe\'s shielding degraded 40% in the first pass. Brutal environment.',
+  ],
+};
+
+const OBS_MYSTERIOUS = [
+  // These are rare and should make the player NEED to go there
+  'The light from this system arrives in pulses. Deliberate, measured pulses.',
+  'Our sensors detected a signal. Then it stopped. It knew we were listening.',
+  'Three objects orbit in perfect geometric formation. Nature doesn\'t do that.',
+  'The star dims at exact intervals. Something is passing in front of it. Something enormous.',
+  'We detected a narrow-band transmission. It lasted 0.3 seconds, then nothing.',
+  'The system emits in a frequency band that doesn\'t occur naturally.',
+  'Gravity readings fluctuate as if something massive is appearing and disappearing.',
+  'There\'s a shadow here with no object casting it.',
+  'Background radiation forms a pattern. Our team disagrees on whether it\'s meaningful.',
+  'The star\'s motion suggests it\'s orbiting something. But there\'s nothing there.',
+  'Light from this system is exactly 1.4 seconds older than it should be.',
+  'We pointed every sensor we have at this star. Every single one returned different data.',
+  'A burst of coherent light. Like a lighthouse, but the period keeps changing.',
+  'The system appears to absorb energy from passing photons. Stars don\'t do that.',
+  'Something here is colder than the cosmic background. That should be impossible.',
+  'We lost contact with a probe near this system fourteen years ago. Its beacon just reactivated.',
+  'The gravitational signature suggests a structure, not a celestial body.',
+  'Spectral analysis returned a result our database calls "undefined."',
+  'Two stars, identical in every measurable way. The odds of that are incalculable.',
+  'The local region of space is quieter than a vacuum should allow.',
+  'Our AI flagged this system three times, then removed the flags. It won\'t explain why.',
+  'There are more neutrinos coming FROM this system than going into it.',
+  'We see the star. We also see it four light-minutes to the left. Same star.',
+  'Something in this system is converting matter to energy at 97% efficiency. Fusion peaks at 0.7%.',
+  'The orbiting bodies here decelerated. Not decayed. Decelerated.',
+  'Light arrives from this system already polarized. Perfectly.',
+  'There\'s a void around this star. Not empty. Void. As in the absence of spacetime itself.',
+  'Our long-range telescopes show a surface. A manufactured surface.',
+  'The emission profile matches nothing in 400 years of astrophysics cataloging.',
+  'Radio silence from this system is absolute. Not quiet. Silent. It blocks everything.',
+];
+
+const OBS_DISTANT = [
+  // Too far away -- can barely see it
+  'A faint point. No data at this range.',
+  'Too far for spectral analysis.',
+  'Barely resolved against the background.',
+  'Sensor returns are noise at this distance.',
+  'A flicker. We\'d need to get much closer.',
+  'Indistinguishable from instrument artifacts.',
+  'Long-range optics can\'t pull anything useful.',
+  'Just a dot. Could be anything.',
+  'Lost in the glare of nearer systems.',
+  'If there\'s something interesting here, we can\'t tell from this far out.',
+  'Our best telescopes show a smudge. Maybe a star.',
+  'At this distance, even the AI shrugs.',
+  'Signal-to-noise ratio: unfavorable.',
+  'Somewhere out there. Beyond our instruments, for now.',
+  'The void between here and there is vast.',
+  'It exists. That\'s the extent of our knowledge.',
+  'Cataloged. Unresolved. Filed under "someday."',
+  'A pinprick of light, patient and waiting.',
+];
+
+const DISCOVERY_HINTS = [
+  'Faint but structured emissions detected nearby. Not natural.',
+  'An energy signature that doesn\'t belong to any known stellar process.',
+  'Something here is broadcasting. Weakly, but deliberately.',
+  'Residual power readings. Someone built something here, once.',
+  'Metallic resonance patterns. Refined alloys, not raw ore.',
+  'The orbital debris field contains machined objects.',
+  'A repeating signal, too orderly for cosmic noise.',
+  'Thermal signature consistent with dormant technology.',
+  'We\'re picking up modulated electromagnetic pulses.',
+  'An artifact of some kind. Old. Very old.',
+];
+
+const RELAY_DISCOVERY_HINT = 'A complex, organized signal on multiple frequencies. This is a communications protocol.';
+
+// Seeded random using star properties so each star always shows the same text
+function starSeed(star) {
+  // Combine multiple properties for a stable hash-like number
+  return Math.abs(Math.sin(star.x * 12.9898 + star.y * 78.233) * 43758.5453) % 1;
+}
+
+function starSeed2(star) {
+  return Math.abs(Math.sin(star.x * 43.332 + star.y * 15.117) * 29471.8832) % 1;
+}
+
+// Assign observation tier to a star: 0=mundane, 1=intriguing, 2=mysterious
+function getObservationTier(star) {
+  const roll = starSeed(star);
+  if (roll < 0.08) return 2; // mysterious
+  if (roll < 0.30) return 1; // intriguing
+  return 0; // mundane
+}
+
+function getObservationText(star) {
+  const tier = getObservationTier(star);
+  const seed = starSeed2(star);
+
+  // Inhospitable stars always show their hostile observation text
+  if (star.resource.upkeep) {
+    const pool = OBS_INTRIGUING[star.resource.name] || OBS_INTRIGUING['Hydrogen'];
+    return { text: pool[Math.floor(seed * pool.length)], tier: 1 };
+  }
+
+  if (tier === 2) {
+    // Mysterious
+    return { text: OBS_MYSTERIOUS[Math.floor(seed * OBS_MYSTERIOUS.length)], tier: 2 };
+  } else if (tier === 1) {
+    // Intriguing - resource-flavored
+    const pool = OBS_INTRIGUING[star.resource.name] || OBS_INTRIGUING['Hydrogen'];
+    return { text: pool[Math.floor(seed * pool.length)], tier: 1 };
+  } else {
+    // Mundane
+    return { text: OBS_MUNDANE[Math.floor(seed * OBS_MUNDANE.length)], tier: 0 };
+  }
+}
+
+function getDistantObservation(star) {
+  const seed = starSeed2(star);
+  return OBS_DISTANT[Math.floor(seed * OBS_DISTANT.length)];
+}
+
+function getDiscoveryHint(star) {
+  if (star.discovery && star.discovery.type === 'relay_tech') {
+    return RELAY_DISCOVERY_HINT;
+  }
+  const seed = starSeed(star);
+  return DISCOVERY_HINTS[Math.floor(seed * DISCOVERY_HINTS.length)];
+}
+
+// Find the nearest connected star to a given star
+function nearestConnectedStar(star) {
+  let best = null;
+  let bestDist = Infinity;
+  for (const s of stars) {
+    if (s.connected && s !== star) {
+      const d = Math.hypot(s.x - star.x, s.y - star.y);
+      if (d < bestDist) { bestDist = d; best = s; }
+    }
+  }
+  return { star: best, dist: bestDist };
+}
+
+function showStarInfo(star, sx, sy) {
+  const el = document.getElementById('star-info');
+  if (!star) { el.style.display = 'none'; return; }
+
+  let html = `<div class="star-name" style="color: ${star.connected ? star.color : '#8899bb'}">${star.name}</div>`;
+
+  if (star.connected) {
+    // Full info for connected stars
+    html += `<div class="star-detail"><span>Resource</span><span style="color:${star.resource.color}">${star.resource.name}</span></div>`;
+    if (star.isHome) {
+      html += `<div class="star-detail"><span>Tech Level</span><span style="color: var(--home-color)">${homeworldLevel}</span></div>`;
+      html += `<div class="star-detail"><span>Network Rate</span><span style="color: var(--energy-color)">${energyRate.toFixed(1)}/s</span></div>`;
+    } else {
+      const depth = star.chainDepth || computeChainDepth(star);
+      const eff = getEfficiency(depth);
+      const upkeep = star.resource.upkeep || 0;
+      const effective = getNetBonus(star.resource) * eff;
+      if (upkeep > 0) {
+        html += `<div class="star-detail"><span style="color: var(--danger)">INHOSPITABLE</span><span style="color: var(--danger)">${star.resource.name}</span></div>`;
+        html += `<div class="star-detail"><span>Upkeep</span><span style="color: var(--danger)">-${(upkeep * eff).toFixed(2)}/s</span></div>`;
+      } else {
+        html += `<div class="star-detail"><span>Base Output</span><span>+${star.resource.energyBonus.toFixed(2)}/s</span></div>`;
+      }
+      html += `<div class="star-detail"><span>Hops to Home</span><span${depth > 2 ? ' style="color: var(--propulsion-color)"' : ''}>${depth}${depth === 1 ? ' (direct)' : ''}</span></div>`;
+      html += `<div class="star-detail"><span>Efficiency</span><span style="color: ${eff >= 0.7 ? 'var(--home-color)' : eff >= 0.5 ? 'var(--propulsion-color)' : 'var(--danger)'}">${Math.round(eff*100)}%</span></div>`;
+      if (upkeep === 0) {
+        html += `<div class="star-detail"><span>Effective</span><span style="color: var(--energy-color)">+${effective.toFixed(2)}/s</span></div>`;
+      }
+    }
+    if (star.discovery) {
+      html += `<div class="star-detail"><span style="color: var(--discovery-color)">Discovery</span><span>${star.discovery.name}</span></div>`;
+    }
+    if (star.isHub) {
+      html += `<div class="star-detail"><span style="color: #00e5ff;">Status</span><span>RELAY HUB</span></div>`;
+    } else if (!star.isHome && hasRelayTech) {
+      const hCost = hubCost + hubCount * hubCostScaling;
+      const canAffordHub = energy >= hCost;
+      html += `<div class="star-detail" style="margin-top: 6px;"><span style="color: #00e5ff;">Upgrade to Hub</span><span style="color: ${canAffordHub ? '#00e5ff' : 'var(--danger)'}">${hCost}E ${canAffordHub ? '(press H)' : ''}</span></div>`;
+    }
+  } else {
+    // Vague observations based on distance from network
+    const netDist = nearestConnectedStar(star).dist;
+    const observationRange = maxRange * 3;
+
+    // Inhospitable warning for unconnected stars in sensor range
+    if (star.resource.upkeep && netDist <= observationRange) {
+      html += `<div class="star-detail"><span style="color: var(--danger); font-weight: 600;">INHOSPITABLE</span><span style="color: var(--danger)">${star.resource.name}</span></div>`;
+      html += `<div class="star-detail"><span style="color: var(--danger); font-size: 12px;">Upkeep: -${star.resource.upkeep.toFixed(2)}/s</span><span></span></div>`;
+    }
+
+    if (netDist <= observationRange) {
+      // Close enough for sensor readings
+      const obs = getObservationText(star);
+      let obsColor = 'var(--text-dim)'; // mundane
+      if (obs.tier === 1) obsColor = '#88aadd'; // intriguing - brighter
+      if (obs.tier === 2) obsColor = '#ddaaff'; // mysterious - purple glow
+
+      html += `<div class="star-detail" style="flex-direction: column; gap: 2px;">`;
+      html += `<span style="color: ${obsColor}; font-style: italic; font-size: 13px;">"${obs.text}"</span>`;
+      html += `</div>`;
+
+      // Discovery hint (if present)
+      if (star.discovery) {
+        const dHint = getDiscoveryHint(star);
+        html += `<div class="star-detail" style="margin-top: 4px; flex-direction: column;">`;
+        html += `<span style="color: var(--discovery-color); font-style: italic; font-size: 13px;">"${dHint}"</span>`;
+        html += `</div>`;
+      }
+    } else {
+      // Too far
+      const obs = getDistantObservation(star);
+      html += `<div class="star-detail" style="flex-direction: column;">`;
+      html += `<span style="color: var(--text-dim); font-style: italic; font-size: 13px;">"${obs}"</span>`;
+      html += `</div>`;
+    }
+
+    // Show best connection routing info
+    const best = findBestConnection(star);
+    const nearest = nearestConnectedStar(star);
+    if (best) {
+      const hops = best.depth + 1;
+      const eff = getEfficiency(hops);
+      html += `<div class="star-detail" style="margin-top: 6px;"><span>Route via</span><span style="color: ${best.star.isHome ? 'var(--home-color)' : 'var(--text)'}">${best.star.isHome ? 'HOMEWORLD' : best.star.name}</span></div>`;
+      html += `<div class="star-detail"><span>Would be</span><span>${hops} hop${hops > 1 ? 's' : ''}, ${Math.round(eff*100)}% eff</span></div>`;
+      if (star.resource.upkeep) {
+        html += `<div class="star-detail"><span>Upkeep drain</span><span style="color: var(--danger)">-${(star.resource.upkeep * eff).toFixed(2)}/s</span></div>`;
+      }
+      const connCost = getConnectionCost(best.star, star);
+      if (energy >= connCost) {
+        html += `<div class="star-detail" style="margin-top: 4px;"><span style="color: var(--energy-color); font-size: 13px;">Double-click to connect (${connCost}E)</span><span></span></div>`;
+      }
+    } else if (nearest.star) {
+      html += `<div class="star-detail" style="margin-top: 6px;"><span>Distance</span><span>${Math.round(nearest.dist)}</span></div>`;
+      if (nearest.dist <= maxRange) {
+        if (!hasRelayTech) {
+          // Check if a non-homeworld connected star could reach it
+          let couldBranch = false;
+          for (const s of stars) {
+            if (!s.connected || s.isHome) continue;
+            const d = Math.hypot(s.x - star.x, s.y - star.y);
+            if (d <= maxRange && !wouldCrossExisting(s, star)) { couldBranch = true; break; }
+          }
+          if (couldBranch) {
+            html += `<div class="star-detail"><span style="color: #ff44ff; font-size: 13px;">Needs Relay Tech to branch</span><span></span></div>`;
+          } else {
+            html += `<div class="star-detail"><span style="color: var(--danger); font-size: 13px;">Blocked: lines would cross</span><span></span></div>`;
+          }
+        } else {
+          html += `<div class="star-detail"><span style="color: var(--danger); font-size: 13px;">Blocked: all routes cross</span><span></span></div>`;
+        }
+      } else {
+        html += `<div class="star-detail"><span>Reachable</span><span style="color: var(--danger)">No</span></div>`;
+      }
+    }
+  }
+
+  el.innerHTML = html;
+  el.style.display = 'block';
+  el.style.left = (sx + 20) + 'px';
+  el.style.top = (sy - 40) + 'px';
+
+  // Keep on screen
+  const rect = el.getBoundingClientRect();
+  if (rect.right > window.innerWidth - 10) {
+    el.style.left = (sx - rect.width - 20) + 'px';
+  }
+  if (rect.bottom > window.innerHeight - 10) {
+    el.style.top = (sy - rect.height) + 'px';
+  }
+}
+
+function showConnectionCost(star, sx, sy) {
+  if (!star || star.connected) {
+    document.getElementById('connection-cost').style.display = 'none';
+    return;
+  }
+
+  const el = document.getElementById('connection-cost');
+  const best = findBestConnection(star);
+
+  if (!best) {
+    // Check if just out of range vs blocked vs needs relay tech
+    const nearest = nearestConnectedStar(star);
+    if (nearest.star && nearest.dist <= maxRange) {
+      if (!hasRelayTech) {
+        // Check if branching would solve it
+        let couldBranch = false;
+        for (const s of stars) {
+          if (!s.connected || s.isHome) continue;
+          const d = Math.hypot(s.x - star.x, s.y - star.y);
+          if (d <= maxRange && !wouldCrossExisting(s, star)) { couldBranch = true; break; }
+        }
+        if (couldBranch) {
+          el.textContent = `NEEDS RELAY TECH`;
+          el.className = 'too-far';
+        } else {
+          el.textContent = `BLOCKED (lines would cross)`;
+          el.className = 'cant-afford';
+        }
+      } else {
+        el.textContent = `BLOCKED (all routes cross)`;
+        el.className = 'cant-afford';
+      }
+    } else if (nearest.star) {
+      el.textContent = `OUT OF RANGE (${Math.round(nearest.dist)}/${Math.round(maxRange)})`;
+      el.className = 'too-far';
+    } else {
+      el.style.display = 'none';
+      return;
+    }
+  } else {
+    const cost = getConnectionCost(best.star, star);
+    if (energy < cost) {
+      el.textContent = `NEED ${cost}E (have ${Math.floor(energy)})`;
+      el.className = 'cant-afford';
+    } else {
+      const hops = best.depth + 1;
+      const eff = Math.round(getEfficiency(hops) * 100);
+      const upkeepTag = star.resource.upkeep ? ' [INHOSPITABLE]' : '';
+      if (best.star.isHome) {
+        el.textContent = `DIRECT LINK: ${cost}E (100%)${upkeepTag}`;
+      } else {
+        el.textContent = `VIA ${best.star.name}: ${cost}E (${eff}% eff, ${hops} hops)${upkeepTag}`;
+      }
+      el.className = 'can-afford';
+    }
+  }
+
+  el.style.display = 'block';
+  el.style.left = (sx + 20) + 'px';
+  el.style.top = (sy + 15) + 'px';
+}
+
+const logEntries = [];
+function addLog(text, type) {
+  const el = document.getElementById('event-log');
+  const entry = document.createElement('div');
+  entry.className = `log-entry log-${type}`;
+  entry.textContent = text;
+  el.appendChild(entry);
+  logEntries.push({ el: entry, time: Date.now() });
+
+  // Keep max 6
+  while (logEntries.length > 6) {
+    const old = logEntries.shift();
+    old.el.remove();
+  }
+
+  // Auto-fade after 5s
+  setTimeout(() => {
+    entry.classList.add('fading');
+    setTimeout(() => entry.remove(), 500);
+  }, 5000);
+}
+
+function showNotification(title, desc, color) {
+  const notif = document.createElement('div');
+  notif.className = 'notification';
+  notif.style.color = color;
+  notif.style.background = `rgba(10, 12, 30, 0.9)`;
+  notif.style.border = `2px solid ${color}`;
+  notif.style.boxShadow = `0 0 30px ${color}40`;
+  notif.innerHTML = `${title}<br><span style="font-size: 12px; font-weight: 400; color: var(--text)">${desc}</span>`;
+  document.getElementById('ui-overlay').appendChild(notif);
+  setTimeout(() => notif.remove(), 2000);
+}
+
+// ========== INPUT ==========
+let mouseScreen = { x: 0, y: 0 };
+
+function getStarAtScreen(sx, sy) {
+  const world = screenToWorld(sx, sy);
+  let closest = null;
+  let closestDist = 20 / camera.zoom; // Hit radius in world space
+
+  for (const star of stars) {
+    const d = Math.hypot(star.x - world.x, star.y - world.y);
+    if (d < closestDist) {
+      closestDist = d;
+      closest = star;
+    }
+  }
+  return closest;
+}
+
+canvas.addEventListener('mousedown', (e) => {
+  if (!gameRunning) return;
+  isDragging = true;
+  dragStart = { x: e.clientX, y: e.clientY };
+  camStart = { x: camera.x, y: camera.y };
+});
+
+canvas.addEventListener('mousemove', (e) => {
+  if (!gameRunning) return;
+  mouseScreen = { x: e.clientX, y: e.clientY };
+
+  if (isDragging) {
+    const dx = e.clientX - dragStart.x;
+    const dy = e.clientY - dragStart.y;
+    camera.x = camStart.x + dx / camera.zoom;
+    camera.y = camStart.y + dy / camera.zoom;
+    return;
+  }
+
+  hoveredStar = getStarAtScreen(e.clientX, e.clientY);
+  if (hoveredStar) {
+    const ss = worldToScreen(hoveredStar.x, hoveredStar.y);
+    showStarInfo(hoveredStar, ss.x, ss.y);
+    showConnectionCost(hoveredStar, ss.x, ss.y);
+    canvas.style.cursor = 'pointer';
+  } else {
+    showStarInfo(null);
+    document.getElementById('connection-cost').style.display = 'none';
+    canvas.style.cursor = 'crosshair';
+  }
+});
+
+canvas.addEventListener('mouseup', (e) => {
+  if (!gameRunning) return;
+  const moved = Math.hypot(e.clientX - dragStart.x, e.clientY - dragStart.y);
+  isDragging = false;
+
+  if (moved > 5) return; // Was a drag
+
+  const clicked = getStarAtScreen(e.clientX, e.clientY);
+
+  if (!clicked) {
+    selectedStar = null;
+    return;
+  }
+
+  // Single click: select
+  selectedStar = clicked;
+});
+
+// Double-click: try to connect
+canvas.addEventListener('dblclick', (e) => {
+  if (!gameRunning) return;
+  e.preventDefault();
+
+  const target = getStarAtScreen(e.clientX, e.clientY);
+  if (!target || target.connected) return;
+
+  // Find the best connection point (prefers homeworld, avoids crossings)
+  const best = findBestConnection(target);
+  if (!best) {
+    addLog(`No valid connection to ${target.name} (blocked or out of range)`, 'tech');
+    return;
+  }
+
+  const cost = getConnectionCost(best.star, target);
+  if (energy < cost) {
+    addLog(`Not enough energy (${Math.floor(energy)}/${cost})`, 'tech');
+    return;
+  }
+
+  const success = connectStar(best.star, target);
+  if (success) {
+    selectedStar = target;
+  }
+});
+
+canvas.addEventListener('wheel', (e) => {
+  if (!gameRunning) return;
+  e.preventDefault();
+  const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+  const newZoom = Math.max(0.02, Math.min(5, camera.zoom * zoomFactor));
+
+  // Zoom toward cursor
+  const world = screenToWorld(e.clientX, e.clientY);
+  camera.zoom = newZoom;
+  const newWorld = screenToWorld(e.clientX, e.clientY);
+  camera.x += newWorld.x - world.x;
+  camera.y += newWorld.y - world.y;
+}, { passive: false });
+
+document.addEventListener('keydown', (e) => {
+  if (!gameRunning) return;
+  if (e.key === 'Escape') selectedStar = null;
+  if (e.key === '=' || e.key === '+') {
+    camera.zoom = Math.min(5, camera.zoom * 1.15);
+  }
+  if (e.key === '-') {
+    camera.zoom = Math.max(0.02, camera.zoom * 0.87);
+  }
+  if ((e.key === 'h' || e.key === 'H') && selectedStar) {
+    if (selectedStar.connected && !selectedStar.isHome && !selectedStar.isHub && hasRelayTech) {
+      upgradeToHub(selectedStar);
+    }
+  }
+});
+
+// Touch support
+let touchStart = null;
+let touchDist = null;
+
+canvas.addEventListener('touchstart', (e) => {
+  if (!gameRunning) return;
+  if (e.touches.length === 1) {
+    touchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    camStart = { x: camera.x, y: camera.y };
+    isDragging = true;
+  } else if (e.touches.length === 2) {
+    touchDist = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY
+    );
+  }
+  e.preventDefault();
+}, { passive: false });
+
+canvas.addEventListener('touchmove', (e) => {
+  if (!gameRunning) return;
+  if (e.touches.length === 1 && isDragging && touchStart) {
+    const dx = e.touches[0].clientX - touchStart.x;
+    const dy = e.touches[0].clientY - touchStart.y;
+    camera.x = camStart.x + dx / camera.zoom;
+    camera.y = camStart.y + dy / camera.zoom;
+  } else if (e.touches.length === 2 && touchDist) {
+    const newDist = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY
+    );
+    camera.zoom = Math.max(0.02, Math.min(5, camera.zoom * (newDist / touchDist)));
+    touchDist = newDist;
+  }
+  e.preventDefault();
+}, { passive: false });
+
+canvas.addEventListener('touchend', (e) => {
+  if (!gameRunning) return;
+  if (e.changedTouches.length === 1 && touchStart) {
+    const t = e.changedTouches[0];
+    const moved = Math.hypot(t.clientX - touchStart.x, t.clientY - touchStart.y);
+    if (moved < 15) {
+      // Tap
+      const clicked = getStarAtScreen(t.clientX, t.clientY);
+      if (!clicked) {
+        selectedStar = null;
+      } else if (selectedStar && selectedStar !== clicked && selectedStar.connected && !clicked.connected) {
+        const success = connectStar(selectedStar, clicked);
+        if (success) selectedStar = clicked;
+      } else {
+        selectedStar = clicked;
+      }
+    }
+  }
+  isDragging = false;
+  touchStart = null;
+  touchDist = null;
+});
+
+// ========== GAME LOOP ==========
+let lastTime = 0;
+
+function gameLoop(timestamp) {
+  const dt = Math.min(0.05, (timestamp - lastTime) / 1000);
+  lastTime = timestamp;
+  animTime += dt;
+
+  if (gameRunning) {
+    updateEnergy(dt);
+    updateParticles(dt);
+    updateFlowParticles(dt);
+    updateHUD();
+  }
+
+  drawBackground();
+  if (gameRunning) {
+    drawConnections();
+    drawFlowParticles();
+    drawPreviewLine();
+    drawStars();
+    drawParticles();
+  }
+
+  requestAnimationFrame(gameLoop);
+}
+
+// ========== START ==========
+document.getElementById('start-btn').addEventListener('click', () => {
+  document.getElementById('start-screen').style.display = 'none';
+  // Reset all game state
+  energy = 150;
+  energyRate = 1.0;
+  maxRange = 80;
+  starsConnected = 1;
+  hasRelayTech = false;
+  hubCount = 0;
+  hubCost = 500;
+  lineCost = 30;
+  homeworldLevel = 1;
+  connections = [];
+  particles = [];
+  flowParticles = [];
+  selectedStar = null;
+  hoveredStar = null;
+  generateStars();
+  gameRunning = true;
+  addLog('Welcome to Star Reach. Double-click nearby stars to connect them.', 'tech');
+  addLog('All connections must go direct to homeworld... for now.', 'tech');
+  updateHUD();
+});
+
+requestAnimationFrame(gameLoop);
+</script>
+</body>
+</html>
