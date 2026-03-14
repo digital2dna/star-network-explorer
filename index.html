@@ -103,11 +103,11 @@
   #star-info {
     position: absolute;
     display: none;
-    background: var(--panel-bg);
+    background: rgba(8, 10, 25, 0.92);
     border: 1px solid var(--border);
     border-radius: 6px;
     padding: 12px 16px;
-    backdrop-filter: blur(12px);
+    backdrop-filter: blur(14px);
     font-size: 15px;
     min-width: 230px;
     max-width: 320px;
@@ -131,7 +131,7 @@
   }
 
   #star-info .star-detail span:first-child {
-    color: var(--text-dim);
+    color: #8899bb;
   }
 
   /* Connection preview */
@@ -427,7 +427,7 @@
     bottom: 72px;
     left: 8px;
     right: 8px;
-    background: var(--panel-bg);
+    background: rgba(8, 10, 25, 0.92);
     border: 1px solid var(--border);
     border-radius: 10px;
     padding: 12px 16px;
@@ -455,7 +455,7 @@
   }
 
   #mobile-star-info .star-detail span:first-child {
-    color: var(--text-dim);
+    color: #8899bb;
   }
 
   /* ========== MOBILE BREAKPOINT (<480px) ========== */
@@ -1693,13 +1693,18 @@ function drawStars() {
         ctx.globalAlpha = 1;
       }
 
-      // Level label
+      // Homeworld label — name + level on two lines, replacing generic star name
       if (camera.zoom > 0.4) {
         const def = getHomeworldDef();
-        ctx.font = `${Math.max(8, 9 * camera.zoom)}px Orbitron`;
-        ctx.fillStyle = level >= 5 ? 'rgba(255, 204, 0, 0.6)' : 'rgba(0, 255, 136, 0.5)';
         ctx.textAlign = 'center';
-        ctx.fillText(def.name.toUpperCase(), s.x, s.y + displaySize + 26);
+        // "HOMEWORLD" in bright green
+        ctx.font = `bold ${Math.max(9, 10 * camera.zoom)}px Orbitron`;
+        ctx.fillStyle = level >= 5 ? 'rgba(255, 204, 0, 0.85)' : 'rgba(0, 255, 136, 0.85)';
+        ctx.fillText('HOMEWORLD', s.x, s.y + displaySize + 16);
+        // Level name beneath, slightly dimmer + smaller
+        ctx.font = `${Math.max(7, 8 * camera.zoom)}px Orbitron`;
+        ctx.fillStyle = level >= 5 ? 'rgba(255, 204, 0, 0.55)' : 'rgba(0, 255, 136, 0.45)';
+        ctx.fillText(def.name.toUpperCase(), s.x, s.y + displaySize + 28);
       }
     }
 
@@ -1724,8 +1729,8 @@ function drawStars() {
       }
     }
 
-    // Label for connected stars
-    if (star.connected && camera.zoom > 0.6) {
+    // Label for connected stars (skip homeworld — has its own label above)
+    if (star.connected && !star.isHome && camera.zoom > 0.6) {
       ctx.font = `${Math.max(9, 10 * camera.zoom)}px Orbitron`;
       ctx.fillStyle = 'rgba(200, 216, 240, 0.6)';
       ctx.textAlign = 'center';
@@ -2614,7 +2619,7 @@ function showStarInfo(star, sx, sy) {
     if (netDist <= observationRange) {
       // Close enough for sensor readings
       const obs = getObservationText(star);
-      let obsColor = 'var(--text-dim)'; // mundane
+      let obsColor = '#8899bb'; // mundane — readable
       if (obs.tier === 1) obsColor = '#88aadd'; // intriguing - brighter
       if (obs.tier === 2) obsColor = '#ddaaff'; // mysterious - purple glow
 
@@ -2633,7 +2638,7 @@ function showStarInfo(star, sx, sy) {
       // Too far
       const obs = getDistantObservation(star);
       html += `<div class="star-detail" style="flex-direction: column;">`;
-      html += `<span style="color: var(--text-dim); font-style: italic; font-size: 13px;">"${obs}"</span>`;
+      html += `<span style="color: #7788aa; font-style: italic; font-size: 13px;">"${obs}"</span>`;
       html += `</div>`;
     }
 
