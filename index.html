@@ -305,64 +305,238 @@
     position: absolute;
     top: 0; left: 0;
     width: 100%; height: 100%;
-    background: rgba(6, 6, 18, 0.95);
+    background: radial-gradient(ellipse at 50% 30%, rgba(15, 20, 50, 0.97), rgba(4, 4, 14, 0.99));
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     z-index: 100;
-    backdrop-filter: blur(4px);
+    backdrop-filter: blur(6px);
+    overflow-y: auto;
+    padding: 40px 24px;
+  }
+
+  #start-screen .start-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    max-width: 520px;
+    width: 100%;
+  }
+
+  /* Animated logo mark */
+  .logo-mark {
+    width: 80px;
+    height: 80px;
+    margin-bottom: 24px;
+    position: relative;
+    animation: logo-pulse 4s ease-in-out infinite;
+  }
+
+  .logo-mark svg {
+    width: 100%;
+    height: 100%;
+    filter: drop-shadow(0 0 20px rgba(0, 229, 255, 0.4)) drop-shadow(0 0 60px rgba(0, 229, 255, 0.15));
+  }
+
+  .logo-mark .ring {
+    animation: logo-spin 20s linear infinite;
+    transform-origin: center;
+  }
+
+  @keyframes logo-pulse {
+    0%, 100% { transform: scale(1); opacity: 0.9; }
+    50% { transform: scale(1.05); opacity: 1; }
+  }
+
+  @keyframes logo-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
   }
 
   #start-screen h1 {
     font-family: 'Orbitron', monospace;
-    font-size: 36px;
+    font-size: 42px;
     font-weight: 900;
-    letter-spacing: 4px;
-    margin-bottom: 8px;
-    background: linear-gradient(135deg, var(--energy-color), #4080ff, var(--propulsion-color));
+    letter-spacing: 8px;
+    margin-bottom: 6px;
+    background: linear-gradient(135deg, #ffffff 0%, var(--energy-color) 40%, #4080ff 70%, var(--propulsion-color) 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-shadow: none;
+    animation: title-glow 3s ease-in-out infinite alternate;
+  }
+
+  @keyframes title-glow {
+    0% { filter: brightness(1); }
+    100% { filter: brightness(1.15); }
   }
 
   #start-screen .subtitle {
-    font-size: 14px;
-    color: var(--text-dim);
-    margin-bottom: 40px;
-    letter-spacing: 2px;
+    font-size: 12px;
+    color: #6a7a9a;
+    margin-bottom: 44px;
+    letter-spacing: 4px;
     text-transform: uppercase;
+    font-weight: 300;
   }
 
-  #start-screen .instructions-block {
-    max-width: 460px;
+  /* Feature cards grid */
+  .feature-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    width: 100%;
+    margin-bottom: 36px;
+  }
+
+  .feature-card {
+    background: rgba(15, 20, 40, 0.6);
+    border: 1px solid rgba(80, 140, 255, 0.12);
+    border-radius: 10px;
+    padding: 16px;
     text-align: left;
-    margin-bottom: 32px;
-    line-height: 1.8;
-    font-size: 14px;
+    transition: border-color 0.3s ease, background 0.3s ease;
   }
 
-  #start-screen .instructions-block p {
-    margin-bottom: 10px;
+  .feature-card:hover {
+    border-color: rgba(80, 140, 255, 0.3);
+    background: rgba(20, 28, 55, 0.6);
   }
 
+  .feature-card .fc-icon {
+    font-size: 20px;
+    margin-bottom: 8px;
+    display: block;
+  }
+
+  .feature-card .fc-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .feature-card .fc-desc {
+    font-size: 12px;
+    color: #8899bb;
+    line-height: 1.5;
+  }
+
+  /* Progression teaser */
+  .progression-bar {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    width: 100%;
+    margin-bottom: 36px;
+    position: relative;
+  }
+
+  .prog-step {
+    flex: 1;
+    text-align: center;
+    position: relative;
+    z-index: 1;
+  }
+
+  .prog-step .prog-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin: 0 auto 6px;
+    border: 1.5px solid;
+  }
+
+  .prog-step .prog-label {
+    font-family: 'Orbitron', monospace;
+    font-size: 8px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    opacity: 0.7;
+  }
+
+  .progression-bar::before {
+    content: '';
+    position: absolute;
+    top: 5px;
+    left: 10%;
+    right: 10%;
+    height: 1px;
+    background: linear-gradient(90deg, var(--home-color), #00e5ff, #ffcc00);
+    opacity: 0.25;
+  }
+
+  /* Launch button — premium feel */
   #start-btn {
     font-family: 'Orbitron', monospace;
-    font-size: 14px;
+    font-size: 15px;
     font-weight: 700;
-    letter-spacing: 2px;
+    letter-spacing: 3px;
     text-transform: uppercase;
-    padding: 14px 48px;
-    border: 2px solid var(--energy-color);
-    background: rgba(0, 229, 255, 0.08);
-    color: var(--energy-color);
-    border-radius: 6px;
+    padding: 16px 64px;
+    border: none;
+    background: linear-gradient(135deg, rgba(0, 229, 255, 0.15), rgba(64, 128, 255, 0.15));
+    color: #fff;
+    border-radius: 50px;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 0 30px rgba(0, 229, 255, 0.1), inset 0 0 30px rgba(0, 229, 255, 0.05);
+    margin-bottom: 40px;
+  }
+
+  #start-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50px;
+    padding: 1.5px;
+    background: linear-gradient(135deg, var(--energy-color), #4080ff, rgba(255, 107, 53, 0.5));
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
   }
 
   #start-btn:hover {
-    background: rgba(0, 229, 255, 0.2);
-    box-shadow: 0 0 24px rgba(0, 229, 255, 0.3);
+    background: linear-gradient(135deg, rgba(0, 229, 255, 0.25), rgba(64, 128, 255, 0.25));
+    box-shadow: 0 0 50px rgba(0, 229, 255, 0.2), inset 0 0 30px rgba(0, 229, 255, 0.08);
+    transform: translateY(-1px);
+  }
+
+  #start-btn:active {
+    transform: translateY(1px);
+    box-shadow: 0 0 20px rgba(0, 229, 255, 0.15);
+  }
+
+  /* Version + credit */
+  .start-footer {
+    text-align: center;
+    margin-top: auto;
+    padding-top: 20px;
+  }
+
+  .start-footer .credit {
+    font-size: 11px;
+    color: #4a5a7a;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+  }
+
+  .start-footer .credit strong {
+    color: #6a7a9a;
+    font-weight: 600;
+  }
+
+  .start-footer .version {
+    font-family: 'Orbitron', monospace;
+    font-size: 9px;
+    color: #3a4a6a;
+    letter-spacing: 1px;
   }
 
   /* Mobile-only elements — hidden on desktop by default */
@@ -528,33 +702,68 @@
       padding: 10px 20px;
     }
 
-    /* Start screen scrollable */
+    /* Start screen mobile */
     #start-screen {
-      overflow-y: auto;
-      -webkit-overflow-scrolling: touch;
+      padding: 32px 16px;
       justify-content: flex-start;
-      padding: 40px 20px;
     }
 
     #start-screen h1 {
-      font-size: 24px;
-      letter-spacing: 2px;
+      font-size: 28px;
+      letter-spacing: 4px;
     }
 
     #start-screen .subtitle {
-      font-size: 11px;
-      margin-bottom: 24px;
+      font-size: 10px;
+      margin-bottom: 28px;
+      letter-spacing: 3px;
     }
 
-    #start-screen .instructions-block {
-      max-width: 100%;
-      font-size: 13px;
-      margin-bottom: 24px;
+    .logo-mark {
+      width: 56px;
+      height: 56px;
+      margin-bottom: 16px;
+    }
+
+    .feature-grid {
+      grid-template-columns: 1fr;
+      gap: 10px;
+      margin-bottom: 28px;
+    }
+
+    .feature-card {
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .feature-card .fc-icon {
+      margin-bottom: 0;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .feature-card .fc-body {
+      flex: 1;
+    }
+
+    .progression-bar {
+      margin-bottom: 28px;
+    }
+
+    .prog-step .prog-label {
+      font-size: 7px;
     }
 
     #start-btn {
-      padding: 14px 40px;
-      margin-bottom: 40px;
+      padding: 14px 48px;
+      font-size: 13px;
+      margin-bottom: 28px;
+    }
+
+    .start-footer .credit {
+      font-size: 10px;
     }
   }
 
@@ -795,21 +1004,104 @@
 </div>
 
 <div id="start-screen">
-  <h1>STAR REACH</h1>
-  <div class="subtitle">Expand your network across the galaxy</div>
-  <div class="instructions-block">
-    <p>You begin as a small <strong style="color: var(--home-color);">Outpost</strong> with enough energy to reach nearby stars. Double-click to connect. Hover for sensor data.</p>
-    <p><strong style="color: var(--home-color);">Upgrade your homeworld</strong> (select it, press U) to unlock new capabilities:</p>
-    <p style="padding-left: 12px; font-size: 13px; line-height: 1.6;">
-      <strong style="color: var(--home-color);">L2 Colony</strong> — 2-hop chains, relay branching<br>
-      <strong style="color: var(--home-color);">L3 Station</strong> — Unlimited hops, +10% efficiency<br>
-      <strong style="color: #00e5ff;">L4 Starbase</strong> — Build relay hubs (press H)<br>
-      <strong style="color: #ffcc00;">L5 Dyson Sphere</strong> — +20% efficiency, hub upgrades
-    </p>
-    <p><strong style="color: var(--energy-color);">Energy</strong> accumulates from your network. Spend it on connections and upgrades.</p>
-    <p><strong style="color: var(--discovery-color);">Discoveries</strong> grant bonus tech. <strong style="color: var(--propulsion-color);">Propulsion tech</strong> extends range.</p>
+  <div class="start-content">
+
+    <!-- Animated logo -->
+    <div class="logo-mark">
+      <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <!-- Central star -->
+        <circle cx="50" cy="50" r="6" fill="#00ff88" opacity="0.9"/>
+        <circle cx="50" cy="50" r="10" fill="none" stroke="#00ff88" stroke-width="0.5" opacity="0.4"/>
+        <!-- Orbiting ring -->
+        <g class="ring">
+          <ellipse cx="50" cy="50" rx="32" ry="32" fill="none" stroke="url(#ring-grad)" stroke-width="1" stroke-dasharray="4 8"/>
+          <circle cx="82" cy="50" r="3" fill="#00e5ff" opacity="0.8"/>
+          <circle cx="26" cy="27" r="2.5" fill="#ff6b35" opacity="0.7"/>
+          <circle cx="35" cy="76" r="2" fill="#ffe44d" opacity="0.6"/>
+        </g>
+        <!-- Outer glow ring -->
+        <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(0,229,255,0.08)" stroke-width="0.5"/>
+        <!-- Connection lines -->
+        <line x1="50" y1="50" x2="82" y2="50" stroke="rgba(0,229,255,0.2)" stroke-width="0.5"/>
+        <line x1="50" y1="50" x2="26" y2="27" stroke="rgba(255,107,53,0.2)" stroke-width="0.5"/>
+        <line x1="50" y1="50" x2="35" y2="76" stroke="rgba(255,228,77,0.2)" stroke-width="0.5"/>
+        <defs>
+          <linearGradient id="ring-grad" x1="18" y1="50" x2="82" y2="50">
+            <stop offset="0%" stop-color="#00e5ff" stop-opacity="0.6"/>
+            <stop offset="50%" stop-color="#4080ff" stop-opacity="0.3"/>
+            <stop offset="100%" stop-color="#ff6b35" stop-opacity="0.6"/>
+          </linearGradient>
+        </defs>
+      </svg>
+    </div>
+
+    <h1>STAR REACH</h1>
+    <div class="subtitle">Build your network across the galaxy</div>
+
+    <!-- Feature cards -->
+    <div class="feature-grid">
+      <div class="feature-card">
+        <span class="fc-icon">&#9889;</span>
+        <div class="fc-body">
+          <div class="fc-title" style="color: var(--energy-color);">Connect</div>
+          <div class="fc-desc">Tap nearby stars to link them to your network and harvest energy</div>
+        </div>
+      </div>
+      <div class="feature-card">
+        <span class="fc-icon">&#11014;</span>
+        <div class="fc-body">
+          <div class="fc-title" style="color: var(--home-color);">Evolve</div>
+          <div class="fc-desc">Upgrade your homeworld from Outpost to Dyson Sphere</div>
+        </div>
+      </div>
+      <div class="feature-card">
+        <span class="fc-icon">&#128301;</span>
+        <div class="fc-body">
+          <div class="fc-title" style="color: var(--discovery-color);">Discover</div>
+          <div class="fc-desc">Find rare technologies and alien artifacts among the stars</div>
+        </div>
+      </div>
+      <div class="feature-card">
+        <span class="fc-icon">&#127759;</span>
+        <div class="fc-body">
+          <div class="fc-title" style="color: #00e5ff;">Expand</div>
+          <div class="fc-desc">Build relay hubs and push into hostile deep space</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Progression teaser -->
+    <div class="progression-bar">
+      <div class="prog-step">
+        <div class="prog-dot" style="border-color: var(--home-color); background: var(--home-color);"></div>
+        <div class="prog-label" style="color: var(--home-color);">Outpost</div>
+      </div>
+      <div class="prog-step">
+        <div class="prog-dot" style="border-color: var(--home-color);"></div>
+        <div class="prog-label" style="color: #6a8a7a;">Colony</div>
+      </div>
+      <div class="prog-step">
+        <div class="prog-dot" style="border-color: var(--home-color);"></div>
+        <div class="prog-label" style="color: #6a8a7a;">Station</div>
+      </div>
+      <div class="prog-step">
+        <div class="prog-dot" style="border-color: #00e5ff;"></div>
+        <div class="prog-label" style="color: #5a7a8a;">Starbase</div>
+      </div>
+      <div class="prog-step">
+        <div class="prog-dot" style="border-color: #ffcc00;"></div>
+        <div class="prog-label" style="color: #8a7a4a;">Dyson Sphere</div>
+      </div>
+    </div>
+
+    <button id="start-btn">LAUNCH MISSION</button>
+
   </div>
-  <button id="start-btn">LAUNCH</button>
+
+  <div class="start-footer">
+    <div class="credit">Created by <strong>Michael Martin</strong></div>
+    <div class="version">v1.0</div>
+  </div>
 </div>
 
 <script>
